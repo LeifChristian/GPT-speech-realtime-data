@@ -6,10 +6,10 @@ import ConversationOverlay from "./ConversationOverlay";
 
 const theCode = process.env.REACT_APP_API_KEY;
 const PWD = 8675309;
-const recognition = new (window.SpeechRecognition ||
-  window.webkitSpeechRecognition)();
+const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
 
 function App() {
+  // [Previous state declarations]
   const inputRef = useRef(null);
   const [isRecording, setIsRecording] = useState(false);
   const [enteredText, setEnteredText] = useState("");
@@ -27,7 +27,9 @@ function App() {
   const [selectedConversationId, setSelectedConversationId] = useState(null);
   const [conversations, setConversations] = useState([]);
   const [isOverlayVisible, setIsOverlayVisible] = useState(false);
-  const [thisConversation, setThisConversation] = useState(null)
+  const [thisConversation, setThisConversation] = useState(null);
+  const [contentResults, setContentResults] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const inputElement = inputRef.current;
@@ -83,32 +85,34 @@ function App() {
     setConversations(storedConversations);
   }, []);
 
-  recognition.interimResults = true;
+  const createAndSelectConversation = async () => {
+    const now = new Date();
+    const formattedDate = now.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: true
+    }).replace(',', '');
+    
+    const newConversation = {
+      id: Date.now().toString(),
+      name: `Conv_${formattedDate}`,
+      history: ''
+    };
 
-  recognition.onresult = (event) => {
-    let interimTranscript = "";
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      const result = event.results[i];
-      if (result.isFinal) {
-        setFinalTranscript(result[0].transcript);
-        setEnteredText(result[0].transcript);
-        stopRecording();
-        handleGreeting(result[0].transcript);
-      } else {
-        interimTranscript += result[0].transcript;
-        setInterimTranscript(interimTranscript);
-      }
-    }
+    const updatedConversations = [...conversations, newConversation];
+    localStorage.setItem('conversations', JSON.stringify(updatedConversations));
+    setConversations(updatedConversations);
+    setSelectedConversationId(newConversation.id);
+    setThisConversation(newConversation);
+    return newConversation;
   };
 
-  recognition.onerror = (event) => {
-    console.error("Error with the speech recognition API:", event.error);
-  };
-
-  const sendStop = () => {
-    setIsTextCleared(prev => !prev);
-    setRez('');
-    stopSpeakText();
+  const handleSelectConversation = (conversationId, conversationObject) => {
+    setSelectedConversationId(conversationId);
+    setIsOverlayVisible(true);
+    setThisConversation(conversationObject);
   };
 
   const handleAddConversation = (name) => {
@@ -117,46 +121,50 @@ function App() {
       name: name,
       history: '',
     };
-
     const updatedConversations = [...conversations, newConversation];
     setConversations(updatedConversations);
-    
     localStorage.setItem('conversations', JSON.stringify(updatedConversations));
-    
     setSelectedConversationId(newConversation.id);
     setThisConversation(newConversation);
-    
     return newConversation;
   };
 
-  const handleResponse = (response1, bool) => {
-    setRez("");
-    if (bool) {
-      speakText(response1);
-      return;
-    }
-  
+  const handleRenameConversation = (conversationId) => {
     const selectedConversation = conversations.find(
-      (conversation) => conversation.id === selectedConversationId
+      (conversation) => conversation.id === conversationId
     );
-  
-    const newHistory = `${selectedConversation.history} Response: ${response1}`;
-  
-    const updatedConversations = conversations.map((conversation) => {
-      if (conversation.id === selectedConversationId) {
-        return {
-          ...conversation,
-          history: newHistory,
-        };
+    if (selectedConversation) {
+      const newConversationName = prompt('Enter a new name for the conversation', selectedConversation.name);
+      if (newConversationName) {
+        const updatedConversations = conversations.map((conversation) => {
+          if (conversation.id === conversationId) {
+            return { ...conversation, name: newConversationName };
+          }
+          return conversation;
+        });
+        setConversations(updatedConversations);
+        localStorage.setItem('conversations', JSON.stringify(updatedConversations));
       }
-      return conversation;
-    });
+    }
+  };
 
-    console.log(thisConversation, '<-- this conversation')
-  
+  const handleDeleteConversation = (conversationId) => {
+    const updatedConversations = conversations.filter(
+      (conversation) => conversation.id !== conversationId
+    );
     setConversations(updatedConversations);
     localStorage.setItem('conversations', JSON.stringify(updatedConversations));
-    speakText(response1);
+    setSelectedConversationId(null);
+  };
+
+  const handleCloseConversation = () => {
+    setIsOverlayVisible(false);
+  };
+
+  const sendStop = () => {
+    setIsTextCleared(prev => !prev);
+    setRez('');
+    stopSpeakText();
   };
 
   const startRecording = () => {
@@ -174,6 +182,33 @@ function App() {
   const stopRecording = () => {
     setIsRecording(false);
     recognition.stop();
+  };
+
+  const stopSpeakText = () => {
+    if ("speechSynthesis" in window) {
+      speechSynthesis.cancel();
+    }
+  };
+
+  const toggleMute = () => {
+    setToggle(prevToggle => !prevToggle);
+    if (window.speechSynthesis.speaking) {
+      stopSpeakText();
+    }
+  };
+
+  const pause = () => {
+    if (isPlaying) {
+      speechSynthesis.pause();
+      setIsPlaying(false);
+    } else {
+      resume();
+      setIsPlaying(true);
+    }
+  };
+
+  const resume = () => {
+    speechSynthesis.resume();
   };
 
   const downloadConvo = () => {
@@ -206,186 +241,10 @@ function App() {
     URL.revokeObjectURL(blobUrl);
   };
 
-  const convertToTimezoneOffset = (isoDateString) => {
-    const date = new Date(isoDateString);
-    const timezoneOffset = date.getTimezoneOffset() * -1;
-    const localDate = new Date(date.getTime() + timezoneOffset * 60000);
-    return localDate.toISOString();
-  };
-
-const createAndSelectConversation = async () => {
-  const now = new Date();
-  const formattedDate = now.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
-    hour12: true
-  }).replace(',', '');
-  
-  const newConversation = {
-    id: Date.now().toString(),
-    name: `Conv_${formattedDate}`,
-    history: ''
-  };
-
-
-  const updatedConversations = [...conversations, newConversation];
-  
-
-  localStorage.setItem('conversations', JSON.stringify(updatedConversations));
-  
-  setConversations(updatedConversations);
-  setSelectedConversationId(newConversation.id);
-  setThisConversation(newConversation);
-
-  return newConversation;
-};
-
-
-const handleGreeting = async (theStuff) => {
-  try {
-    let currentConversation;
-    
-    if (!selectedConversationId) {
-
-      currentConversation = await createAndSelectConversation();
-
-      const storedConversations = JSON.parse(localStorage.getItem('conversations') || '[]');
-      if (!storedConversations.some(conv => conv.id === currentConversation.id)) {
-        storedConversations.push(currentConversation);
-        localStorage.setItem('conversations', JSON.stringify(storedConversations));
-      }
-    } else {
-
-      currentConversation = conversations.find(
-        conv => conv.id === selectedConversationId
-      );
-      
-      if (!currentConversation) {
-   
-        currentConversation = await createAndSelectConversation();
-      }
-    }
-
-    if (!currentConversation) {
-      console.error("Failed to create or find conversation");
-      return;
-    }
-
-    const storedConversations = JSON.parse(localStorage.getItem('conversations') || '[]');
-    const latestConversation = storedConversations.find(conv => conv.id === currentConversation.id) || currentConversation;
-   
-
-    const existingHistory = latestConversation.history || '';
-    const newMessage = existingHistory 
-      ? `${existingHistory} Question: ${theStuff}`
-      : `Question: ${theStuff}`;
-
-    const payload = {
-      text: `${newMessage} <-- Text before this sentence is conversation history so far between you and me. Do NOT include timestamps in responses, timestamps provide context for when this conversation is taking place. responses will be spoken back to user using TTS. Using this information and context, answer the following question, calling functions if asked current information -->  "${theStuff}"`,
-      code: theCode,
-    };
-
-    const response = await fetch("http://localhost:3001/greeting", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (response.ok) {
-      const responseData = await response.json();
-      const reply = responseData.reply;
-      
-      setResponse(reply);
-      setRez(reply);
-      speakText(reply);
-      pause();
-
-      const newUpdatedHistory = `${newMessage} Response: ${reply}`;
-      
-
-      const updatedConversation = {
-        ...currentConversation,
-        history: newUpdatedHistory
-      };
-
-
-      const latestStoredConversations = JSON.parse(localStorage.getItem('conversations') || '[]');
-      
-
-      const finalUpdatedConversations = latestStoredConversations.map(conv => 
-        conv.id === updatedConversation.id ? updatedConversation : conv
-      );
-
-
-      localStorage.setItem('conversations', JSON.stringify(finalUpdatedConversations));
-      setConversations(finalUpdatedConversations);
-      setThisConversation(updatedConversation);
-      setSelectedConversationId(updatedConversation.id);
-    }
-  } catch (error) {
-    console.error("Error -->", error);
-  }
-};
-
-
-useEffect(() => {
-  console.log('Conversations updated:', conversations);
-  console.log('Selected conversation ID:', selectedConversationId);
-  console.log('Current conversation:', thisConversation);
-}, [conversations, selectedConversationId, thisConversation]);
-
-  const handleSelectConversation = (conversationId, conversationObject) => {
-    setSelectedConversationId(conversationId);
-    setIsOverlayVisible(true);
-    console.log('Selected Conversation ID:', conversationId);
-
-    setThisConversation(conversationObject)
-    console.log(thisConversation, 'current conversation')
-  };
-
-  const handleRenameConversation = (conversationId) => {
-    const selectedConversation = conversations.find(
-      (conversation) => conversation.id === conversationId
-    );
-
-    if (selectedConversation) {
-      const newConversationName = prompt('Enter a new name for the conversation', selectedConversation.name);
-      if (newConversationName) {
-        const updatedConversations = conversations.map((conversation) => {
-          if (conversation.id === conversationId) {
-            return {
-              ...conversation,
-              name: newConversationName,
-            };
-          }
-          return conversation;
-        });
-        setConversations(updatedConversations);
-        localStorage.setItem('conversations', JSON.stringify(updatedConversations));
-      }
-    }
-  };
-
-  const handleDeleteConversation = (conversationId) => {
-    const updatedConversations = conversations.filter(
-      (conversation) => conversation.id !== conversationId
-    );
-    setConversations(updatedConversations);
-    localStorage.setItem('conversations', JSON.stringify(updatedConversations));
-    setSelectedConversationId(null);
-  };
-
   const clearConversationHistory = () => {
     const updatedConversations = conversations.map((conversation) => {
       if (conversation.id === selectedConversationId) {
-        return {
-          ...conversation,
-          history: '',
-        };
+        return { ...conversation, history: '' };
       }
       return conversation;
     });
@@ -404,8 +263,8 @@ useEffect(() => {
     }
 
     text = removeUrls(text);
-
     setShowPlayPause(true);
+
     if ("speechSynthesis" in window) {
       if (toggle) {
         setShowPlayPause(true);
@@ -415,7 +274,6 @@ useEffect(() => {
       const splitTextIntoSegments = (text) => {
         const maxWordsPerSegment = 32;
         const sentences = text.split(/([.!?:])/);
-
         const segments = [];
         let currentSegment = "";
 
@@ -428,7 +286,6 @@ useEffect(() => {
             segments.push(sentence.trim());
           } else {
             const words = sentence.split(/\s+/);
-
             words.forEach((word) => {
               if (currentSegment.split(/\s+/).length < maxWordsPerSegment) {
                 if (currentSegment.endsWith(".") && word === "com") {
@@ -447,7 +304,6 @@ useEffect(() => {
         if (currentSegment) {
           segments.push(currentSegment);
         }
-
         return segments;
       };
 
@@ -459,9 +315,14 @@ useEffect(() => {
           setIsPlaying(false);
           return;
         }
-
         const segment = segments.shift();
-        const utterance = new SpeechSynthesisUtterance(segment.replaceAll('Response:', '').replaceAll('.', '').replaceAll('!', '').replaceAll('?', '').replaceAll(":", ""));
+        const utterance = new SpeechSynthesisUtterance(
+          segment.replaceAll('Response:', '')
+            .replaceAll('.', '')
+            .replaceAll('!', '')
+            .replaceAll('?', '')
+            .replaceAll(":", "")
+        );
         utterance.voice = speechSynthesis.getVoices()[5];
         utterance.onend = synthesizeSegments;
         speechSynthesis.speak(utterance);
@@ -473,41 +334,32 @@ useEffect(() => {
     }
   };
 
-  const stopSpeakText = () => {
-    if ("speechSynthesis" in window) {
-      speechSynthesis.cancel();
+  const handleResponse = (response1, bool) => {
+    setRez("");
+    if (bool) {
+      speakText(response1);
+      return;
     }
-  };
+  
+    const selectedConversation = conversations.find(
+      (conversation) => conversation.id === selectedConversationId
+    );
+  
+    const newHistory = `${selectedConversation.history} Response: ${response1}`;
+    const updatedConversations = conversations.map((conversation) => {
+      if (conversation.id === selectedConversationId) {
+        return { ...conversation, history: newHistory };
+      }
+      return conversation;
+    });
 
-  const toggleMute = () => {
-    setToggle(prevToggle => !prevToggle);
-    if (window.speechSynthesis.speaking) {
-      stopSpeakText();
-    }
+    setConversations(updatedConversations);
+    localStorage.setItem('conversations', JSON.stringify(updatedConversations));
+    speakText(response1);
   };
-
-  const pause = () => {
-    if (isPlaying) {
-      speechSynthesis.pause();
-      setIsPlaying(false);
-    } else {
-      resume();
-      setIsPlaying(true);
-    }
-  };
-
-  const resume = () => {
-    speechSynthesis.resume();
-  };
-
-  const handleCloseConversation = () => {
-    setIsOverlayVisible(false);
-  };
-
 
   const renderTextWithLinks = (text) => {
     const urlRegex = /(https?:\/\/[^\s]+?)(?=\))|https?:\/\/[^\s]+/g;
-    
     return text.split(/(https?:\/\/[^\s]+?)(?=\))|https?:\/\/[^\s]+/).map((part, index) => {
       if (part.match(urlRegex)) {
         return (
@@ -526,32 +378,124 @@ useEffect(() => {
     });
   };
 
+  // [Previous handleGreeting implementation with content generation]
+
+  const handleGreeting = async (theStuff) => {
+    try {
+      setIsLoading(true);
+      let currentConversation;
+      
+      if (!selectedConversationId) {
+        currentConversation = await createAndSelectConversation();
+        const storedConversations = JSON.parse(localStorage.getItem('conversations') || '[]');
+        if (!storedConversations.some(conv => conv.id === currentConversation.id)) {
+          storedConversations.push(currentConversation);
+          localStorage.setItem('conversations', JSON.stringify(storedConversations));
+        }
+      } else {
+        currentConversation = conversations.find(
+          conv => conv.id === selectedConversationId
+        );
+        
+        if (!currentConversation) {
+          currentConversation = await createAndSelectConversation();
+        }
+      }
+
+      if (!currentConversation) {
+        console.error("Failed to create or find conversation");
+        return;
+      }
+
+      // Add content generation API call
+      const contentResponse = await fetch("http://localhost:3001/generateContent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: theStuff, code: theCode }),
+      });
+
+      if (contentResponse.ok) {
+        const contentData = await contentResponse.json();
+        setContentResults(contentData.results);
+      }
+
+      const storedConversations = JSON.parse(localStorage.getItem('conversations') || '[]');
+      const latestConversation = storedConversations.find(conv => conv.id === currentConversation.id) || currentConversation;
+      
+      const existingHistory = latestConversation.history || '';
+      const newMessage = existingHistory 
+        ? `${existingHistory} Question: ${theStuff}`
+        : `Question: ${theStuff}`;
+
+      const payload = {
+        text: `${newMessage} <-- Text before this sentence is conversation history so far between you and me. Do NOT include timestamps in responses, timestamps provide context for when this conversation is taking place. responses will be spoken back to user using TTS. Using this information and context, answer the following question, calling functions if asked current information -->  "${theStuff}"`,
+        code: theCode,
+      };
+
+      const response = await fetch("http://localhost:3001/greeting", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        const responseData = await response.json();
+        const reply = responseData.reply;
+        
+        setResponse(reply);
+        setRez(reply);
+        speakText(reply);
+        pause();
+
+        const newUpdatedHistory = `${newMessage} Response: ${reply}`;
+        
+        const updatedConversation = {
+          ...currentConversation,
+          history: newUpdatedHistory
+        };
+
+        const latestStoredConversations = JSON.parse(localStorage.getItem('conversations') || '[]');
+        const finalUpdatedConversations = latestStoredConversations.map(conv => 
+          conv.id === updatedConversation.id ? updatedConversation : conv
+        );
+
+        localStorage.setItem('conversations', JSON.stringify(finalUpdatedConversations));
+        setConversations(finalUpdatedConversations);
+        setThisConversation(updatedConversation);
+        setSelectedConversationId(updatedConversation.id);
+      }
+    } catch (error) {
+      console.error("Error -->", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const selectedConversation = conversations.find(
     (conversation) => conversation.id === selectedConversationId
   );
 
-  
-
   return (
     <div className="App">
-    <SidePanel
-  onSelectConversation={handleSelectConversation}
-  onAddConversation={handleAddConversation}
-  onRenameConversation={handleRenameConversation}
-  onDeleteConversation={handleDeleteConversation}
-  setThisConversation={setThisConversation}
-  selectedConversationId={selectedConversationId}
-  conversations={conversations}  
-/>
+      <SidePanel
+        onSelectConversation={handleSelectConversation}
+        onAddConversation={handleAddConversation}
+        onRenameConversation={handleRenameConversation}
+        onDeleteConversation={handleDeleteConversation}
+        setThisConversation={setThisConversation}
+        selectedConversationId={selectedConversationId}
+        conversations={conversations}
+      />
+      
       {isOverlayVisible && (
         <ConversationOverlay
           conversation={selectedConversation}
           onClose={handleCloseConversation}
         />
       )}
-      {/* <div style={{position: 'absolute', top: '70px', left: '10px', color: 'lightgrey', fontSize: '2rem'}}>{thisConversation?.name}</div> */}
+      
       <header className="App-header">
-        <h1 style={{ color: 'lightgrey', marginTop: '2vh' }}>ΩmnÎbot-βeta</h1>
+        <h1 style={{ color: 'lightgrey', marginTop: '2vh' }}>7Minds Beta</h1>
         <div id="dick"></div>
         <div className="buttons-container">
           {windowWidth >= 468 ? (
@@ -593,6 +537,42 @@ useEffect(() => {
             </button>
           ) : ''}
         </div>
+
+        {contentResults.length > 0 && (
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
+            gap: '1rem', 
+            padding: '1rem',
+            width: '90vw',
+            margin: 'auto'
+          }}>
+            {contentResults.map((result, index) => (
+              <div key={index} style={{
+                background: '#1a1a1a',
+                color: 'white',
+                padding: '1rem',
+                borderRadius: '0.5rem',
+                border: '1px solid #333',
+                marginBottom: '1rem'
+              }}>
+                <h3 style={{ marginBottom: '0.5rem', textTransform: 'capitalize', color: 'lightgrey' }}>
+                  {result.type} Content
+                </h3>
+                <div style={{ 
+                  whiteSpace: 'pre-wrap',
+                  color: 'lightgrey',
+                  fontSize: '1rem',
+                  maxHeight: '400px',
+                  overflow: 'auto'
+                }}>
+                  {result.content}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div style={{ marginTop: "10vh" }}></div>
         <div className="transcript-container"></div>
         <div>
@@ -620,7 +600,7 @@ useEffect(() => {
               setInterimTranscript("");
               setFinalTranscript("");
             }}
-            placeholder="Enter your question"
+            placeholder="Enter your brand description..."
           />
           <br />
           <button
@@ -629,7 +609,6 @@ useEffect(() => {
             onClick={() => {
               sendStop();
               handleGreeting(enteredText);
-              console.log(enteredText);
             }}
           >
             Send
@@ -678,7 +657,6 @@ useEffect(() => {
               whiteSpace: 'pre-wrap',
             }}
           >
-            {/* {rez} */}
             {renderTextWithLinks(rez)}
           </p>
         </div>

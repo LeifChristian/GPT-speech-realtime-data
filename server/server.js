@@ -4,8 +4,7 @@ require('dotenv').config();
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const axios = require('axios')
- const apiKey = process.env.openAPIKey
-
+ const apiKey = ''
 // console.log(process.env, myAPIKey)
 
 const bodyParser = require('body-parser');
@@ -705,7 +704,136 @@ app.post('/saveFile', async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3001;
+// app.post('/generateContent', async (req, res) => {
+//   const { text, code } = req.body;
+  
+//   if (!code || code !== process.env.theCode) {
+//     return res.status(401).json({ error: 'Unauthorized' });
+//   }
+
+//   try {
+//     const formats = [
+//       { type: 'quora', prompt: `Create a detailed Quora answer format post about this brand/topic: ${text}. Focus on providing expert insights and practical value.` },
+//       { type: 'medium', prompt: `Transform this brand/topic into a professional Medium article format: ${text}. Include clear sections, insights, and actionable takeaways.` },
+//       { type: 'youtube', prompt: `Create a YouTube video script format for this brand/topic: ${text}. Include intro hook, main points, and call-to-action.` },
+//       { type: 'linkedin', prompt: `Create a compelling LinkedIn post format about this brand/topic: ${text}. Focus on professional insights and industry relevance.` }
+//     ];
+
+//     const contentPromises = formats.map(async format => {
+//       const response = await openai.chat.completions.create({
+//         model: "gpt-3.5-turbo-0125",
+//         messages: [{ role: 'user', content: format.prompt }]
+//       });
+      
+//       return {
+//         type: format.type,
+//         content: response.choices[0].message.content
+//       };
+//     });
+
+//     const results = await Promise.all(contentPromises);
+//     res.json({ results });
+    
+//   } catch (error) {
+//     console.error('Error:', error);
+//     res.status(500).json({ error: 'Error generating content' });
+//   }
+// });
+
+
+app.post('/generateContent', async (req, res) => {
+  const { text, code } = req.body;
+  
+  if (!code || code !== process.env.theCode) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const formats = [
+      { 
+        type: 'quora',
+        prompt: `As an industry expert, create a comprehensive, data-backed Quora answer about ${text}. Include: 
+                1. Expert analysis of their market position
+                2. Specific examples and case studies
+                3. Industry statistics and performance metrics
+                4. Professional assessment of strengths/weaknesses
+                5. Future outlook and predictions
+                Format with clear sections, bullet points for key facts, and cite specific examples.`
+      },
+      { 
+        type: 'medium',
+        prompt: `Create a detailed Medium article analyzing ${text}. Structure as follows:
+                1. Executive Summary
+                2. Company Background & Evolution
+                3. Business Model Analysis
+                4. Market Position & Competitive Advantage
+                5. Innovation & Technology Strategy
+                6. Financial Performance & Metrics
+                7. Future Growth Opportunities
+                8. Industry Impact & Trends
+                Include specific data points, examples, and industry insights.`
+      },
+      { 
+        type: 'youtube',
+        prompt: `Create a detailed YouTube video script analyzing ${text}. Include:
+                [Hook/Intro]
+                - Attention-grabbing statistic or fact
+                - Clear value proposition
+                
+                [Main Content]
+                1. Company Overview
+                2. Success Factors Deep-Dive
+                3. Industry Impact Analysis
+                4. Behind-the-Scenes Insights
+                5. Future Predictions
+                
+                [Outro]
+                - Key Takeaways
+                - Call to Action
+                
+                Format with timestamps, talking points, and B-roll suggestions.`
+      },
+      { 
+        type: 'linkedin',
+        prompt: `Create a viral-style LinkedIn post analyzing ${text}. Include:
+                1. Hook with surprising industry insight
+                2. Key business learnings
+                3. Strategic analysis
+                4. Market impact
+                5. Personal perspective
+                6. Industry implications
+                
+                Use LinkedIn-style formatting with emojis, bullet points, and clear spacing. Focus on professional insights that would interest executives and industry leaders.`
+      }
+    ];
+
+    const contentPromises = formats.map(async format => {
+      const response = await openai.chat.completions.create({
+        model: "gpt-3.5-turbo-0125",
+        messages: [{ role: 'user', content: format.prompt }],
+        max_tokens: 1000,
+        temperature: 0.7
+      });
+      
+      return {
+        type: format.type,
+        content: response.choices[0].message.content
+      };
+    });
+
+    const results = await Promise.all(contentPromises);
+    res.json({ results });
+    
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ error: 'Error generating content' });
+  }
+});
+
+
+const PORT = 3001;
 app.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
 });
+
+

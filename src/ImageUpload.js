@@ -113,7 +113,7 @@ const ImageUpload = ({ sendStop, isTextCleared, handleResponse, setRez}) => {
   return (
     <div style={{ color: 'lightgrey', position: 'fixed', marginTop: "11vh", width: "100vw", fontSize: '1.2rem' }}>
       <br /> <br />
-      <button className="button2" onClick={handleImageUpload}>📷</button>
+      {/* <button className="button2" onClick={handleImageUpload}>📷</button>
       <input className="button2"
         id="fileInput"
         type="file" 
@@ -121,17 +121,17 @@ const ImageUpload = ({ sendStop, isTextCleared, handleResponse, setRez}) => {
         capture="environment" 
         onChange={handleFileChange} 
         style={{ display: 'none' }} // Hide default file input
-      />
+      /> */}
 
-      <input className="button2"
+      {/* <input className="button2"
         id="fileInput2"
         type="file"
         accept="image/*"
         onChange={handleFileChange}
         style={{ display: 'none' }} // Hide default file input
-      />
+      /> */}
       
-      <label htmlFor="fileInput" style={{
+      {/* <label htmlFor="fileInput" style={{
         display: 'inline-block',
         background: 'transparent',
         color: 'lightgrey',
@@ -140,9 +140,9 @@ const ImageUpload = ({ sendStop, isTextCleared, handleResponse, setRez}) => {
         cursor: 'pointer',
       }}>
       Snap
-      </label>
+      </label> */}
 
-      <label htmlFor="fileInput2" style={{
+      {/* <label htmlFor="fileInput2" style={{
         display: 'inline-block',
         background: 'transparent',
         color: 'lightgrey',
@@ -151,10 +151,10 @@ const ImageUpload = ({ sendStop, isTextCleared, handleResponse, setRez}) => {
         cursor: 'pointer',
       }}>
       +File
-      </label>
+      </label> */}
 
       <br />
-      <input className="button2 placeholder-style"
+      {/* <input className="button2 placeholder-style"
         type="text"
         value={prompt}
         
@@ -170,9 +170,9 @@ const ImageUpload = ({ sendStop, isTextCleared, handleResponse, setRez}) => {
           border: '1px solid #ccc',
           width: '40vw'
         }}
-      />
-
-      <button className="button2" onClick={handlePromptSubmit}>🖼️</button>
+      /> */}
+{/* 
+      <button className="button2" onClick={handlePromptSubmit}>🖼️</button> */}
       
       {fileURL && thumb && (
         <div style={{ textAlign: 'center', margin: 'auto', width: '100vw', position: 'absolute', top: '18vh'}}>
