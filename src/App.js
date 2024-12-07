@@ -552,7 +552,7 @@ useEffect(() => {
       {/* <div style={{position: 'absolute', top: '70px', left: '10px', color: 'lightgrey', fontSize: '2rem'}}>{thisConversation?.name}</div> */}
       <header className="App-header">
         <h1 style={{ color: 'lightgrey', marginTop: '2vh' }}>ΩmnÎbot-βeta</h1>
-        <div id="dick"></div>
+        <div id="space"></div>
         <div className="buttons-container">
           {windowWidth >= 468 ? (
             <button className="button" onClick={() => startRecording()} type="button">
