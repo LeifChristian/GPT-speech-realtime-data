@@ -11,7 +11,8 @@ export const usePasswordProtection = () => {
   const [isLocked, setIsLocked] = useState(false);
   const [lockoutEndTime, setLockoutEndTime] = useState(null);
 
-  const isDevelopment = process.env.NODE_ENV === 'development';
+  const isDevelopment = process.env.REACT_APP_NODE_ENV === 'development';
+
 
   useEffect(() => {
     if (isDevelopment) {

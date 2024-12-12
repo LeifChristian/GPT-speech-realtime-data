@@ -1,19 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 
 const ImageUpload = ({ sendStop, isTextCleared, handleResponse, setRez}) => {
-
-
   const [file, setFile] = useState(null);
-  const [fileURL, setFileURL] = useState(null); // New state for file URL
+  const [fileURL, setFileURL] = useState(null);
   const [prompt, setPrompt] = useState('');
   const [response, setResponse] = useState(null);
   const [thumb, showThumb] = useState(false);
 
-  // Effect to clear the response when isTextCleared is true
   useEffect(() => {
     if (isTextCleared) {
-      setResponse(null); // Clear the response that controls the text display
-      sendStop(); // Call this method from props to reset the isTextCleared in the parent
+      setResponse(null); 
+      sendStop(); 
     }
   }, [isTextCleared, sendStop]);
 
@@ -21,7 +18,7 @@ const ImageUpload = ({ sendStop, isTextCleared, handleResponse, setRez}) => {
   const handleFileChange = (event) => {
     const selectedFile = event.target.files[0];
     setFile(selectedFile);
-    setFileURL(URL.createObjectURL(selectedFile)); // Create a URL for the file
+    setFileURL(URL.createObjectURL(selectedFile));
     showThumb(true);
   };
 
@@ -30,7 +27,7 @@ const ImageUpload = ({ sendStop, isTextCleared, handleResponse, setRez}) => {
     setPrompt(event.target.value);
   };
 
-  // Handle image upload
+  // Handle image upload (analysis)
   const handleImageUpload = async () => {
     setRez("");
     if (!file) {
@@ -46,8 +43,7 @@ const ImageUpload = ({ sendStop, isTextCleared, handleResponse, setRez}) => {
     setResponse('');
 
     try {
-      // const response = await fetch('http://54.193.73.75:3001/sendImage', {
-      const response = await fetch('http://localhost:3001/sendImage', {
+      const response = await fetch('http://localhost:3001/image/analyze', {
         method: 'POST',
         body: formData,
       });
@@ -66,21 +62,18 @@ const ImageUpload = ({ sendStop, isTextCleared, handleResponse, setRez}) => {
     }
   };
 
-  // Handle prompt submission
+  // Handle prompt submission (image generation)
   const handlePromptSubmit = async () => {
-     setRez("");
-      // sendStop()
+    setRez("");
     if (!prompt) {
       alert('Please enter a prompt');
       return;
     }
-    // handleResponse(`${prompt}`);
     handleResponse('sure, one sec!', true);
     showThumb(false);
 
     try {
-    //  const response = await fetch('http://54.193.73.75:3001/upload', {
-      const response = await fetch('http://localhost:3001/upload', {
+      const response = await fetch('http://localhost:3001/image/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -157,7 +150,6 @@ const ImageUpload = ({ sendStop, isTextCleared, handleResponse, setRez}) => {
       <input className="button2 placeholder-style"
         type="text"
         value={prompt}
-        
         onChange={handlePromptChange}
         placeholder="Ask about/create image"
         style={{

@@ -97,7 +97,7 @@ const handleGreeting = async (theStuff) => {
         code: apiKey,
       };
 
-      const response = await fetch("http://localhost:3001/greeting", {
+      const response = await fetch("http://localhost:3001/chat/greeting", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
