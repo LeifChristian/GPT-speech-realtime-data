@@ -111,8 +111,8 @@ const ImageUpload = ({ sendStop, isTextCleared, handleResponse, setRez}) => {
   };
 
   return (
-    <div style={{ color: 'lightgrey', position: 'fixed', marginTop: "11vh", width: "100vw", fontSize: '1.2rem' }}>
-      <br /> <br />
+    <div style={{ color: 'lightgrey', position: 'fixed', marginTop: "-2vh", width: "100vw", fontSize: '1.2rem' }}>
+
       <button className="button2" onClick={handleImageUpload}>📷</button>
       <input className="button2"
         id="fileInput"
@@ -120,7 +120,7 @@ const ImageUpload = ({ sendStop, isTextCleared, handleResponse, setRez}) => {
         accept="image/*"
         capture="environment" 
         onChange={handleFileChange} 
-        style={{ display: 'none' }} // Hide default file input
+        style={{ display: 'none' }} 
       />
 
       <input className="button2"
@@ -128,7 +128,7 @@ const ImageUpload = ({ sendStop, isTextCleared, handleResponse, setRez}) => {
         type="file"
         accept="image/*"
         onChange={handleFileChange}
-        style={{ display: 'none' }} // Hide default file input
+        style={{ display: 'none' }} 
       />
       
       <label htmlFor="fileInput" style={{

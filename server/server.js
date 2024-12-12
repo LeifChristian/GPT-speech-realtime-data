@@ -285,7 +285,7 @@ app.post('/greeting', async (req, res) => {
       const limit = 1; // We only need the top result
       const url = `${apiBase}?q=${searchTerm}&type=${type}&market=${market}&limit=${limit}`;
     
-      // You'll need to replace this with your actual access token
+      // Replace this with your actual access token
       const accessToken = "YOUR_SPOTIFY_ACCESS_TOKEN";
     
       try {
@@ -403,7 +403,7 @@ async function get_realtime_data(query) {
           messages: messages,
           functions: functions,
           function_call: 'auto',
-           // max_tokens: 60, // Specify the desired length in tokens
+           // max_tokens: 60, 
           
         }, axiosConfig);
       
@@ -463,10 +463,7 @@ async function get_realtime_data(query) {
   }
 });
 
-
-
 // const LlamaAI = require('llamaai');
-// // Initialize Llama API
 // const llamaAPI = new LlamaAI('tokenHere');
 
 app.post('/greetingTwo', async (req, res) => {
