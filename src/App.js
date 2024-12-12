@@ -17,6 +17,7 @@ function App() {
   const [rez, setRez] = useState("");
   const [isTextCleared, setIsTextCleared] = useState(false);
   const [isOverlayVisible, setIsOverlayVisible] = useState(false);
+  const [selectedConversationId, setSelectedConversationId] = useState(null);
 
   const {
     isRecording,
@@ -40,7 +41,6 @@ function App() {
       return;
     }
 
-
     setRez(response1);  
 
     const selectedConversation = conversations.find(
@@ -62,10 +62,8 @@ function App() {
 
   const {
     conversations,
-    selectedConversationId,
     thisConversation,
     handleAddConversation,
-    handleSelectConversation,
     handleRenameConversation,
     handleDeleteConversation,
     clearConversationHistory,
@@ -74,6 +72,13 @@ function App() {
     downloadConvo,
     setThisConversation
   } = useConversations(API_KEY, setRez, handleResponse);
+
+  // New method for handling conversation selection
+  const handleSelectConversation = (conversationId, conversation) => {
+    setSelectedConversationId(conversationId);
+    setThisConversation(conversation);
+    setIsOverlayVisible(true);
+  };
 
   usePasswordProtection();
 
@@ -161,7 +166,6 @@ function App() {
             textAlign: 'center',
             whiteSpace: 'pre-wrap',
             zIndex: 3000,
-          
           }}>
             {rez}
           </div>
