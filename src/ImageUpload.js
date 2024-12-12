@@ -74,7 +74,7 @@ const ImageUpload = ({ sendStop, isTextCleared, handleResponse, setRez}) => {
       alert('Please enter a prompt');
       return;
     }
-    handleResponse(`${prompt}`);
+    // handleResponse(`${prompt}`);
     handleResponse('sure, one sec!', true);
     showThumb(false);
 
