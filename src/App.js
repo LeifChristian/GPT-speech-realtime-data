@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import "./App.css";
 import SidePanel from "./components/SidePanel";
-import ImageUpload from "./components/ImageUpload";
 import ConversationOverlay from "./components/ConversationOverlay";
-import ConversationInput from "./components/ConversationInput";
 import AudioControls from "./components/AudioControls";
+import ModernUnifiedInput from "./components/ModernUnifiedInput";
+import ModernImageSidebar from "./components/ModernImageSidebar";
 import { useConversations } from "./hooks/useConversations";
 import { useSpeech } from "./hooks/useSpeech";
 import { usePasswordProtection } from "./hooks/usePasswordProtection";
@@ -15,14 +16,13 @@ function App() {
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [enteredText, setEnteredText] = useState("");
   const [rez, setRez] = useState("");
-  const [isTextCleared, setIsTextCleared] = useState(false);
   const [isOverlayVisible, setIsOverlayVisible] = useState(false);
   const [selectedConversationId, setSelectedConversationId] = useState(null);
+  const [generatedImage, setGeneratedImage] = useState(null);
+  const [sessionImages, setSessionImages] = useState([]);
 
   const {
-    isRecording,
     startRecording,
-    stopRecording,
     isPlaying,
     showPlayPause,
     speakText,
@@ -33,7 +33,7 @@ function App() {
     setIsPlaying
   } = useSpeech(setRez, setEnteredText);
 
-  const handleResponse = (response1, bool) => {
+  const handleResponse = (response1, bool, imageData = null) => {
     if (bool) {
       // For temporary messages like "Analyzing your image..."
       setRez(response1);
@@ -41,7 +41,24 @@ function App() {
       return;
     }
 
-    setRez(response1);  
+    // Handle image responses
+    if (imageData && imageData.type === 'image') {
+      setGeneratedImage(imageData.content);
+      // Add to session images
+      const newImage = {
+        id: Date.now(),
+        url: imageData.content,
+        prompt: enteredText,
+        timestamp: new Date().toISOString()
+      };
+      setSessionImages(prev => [...prev, newImage]);
+      setRez(`Generated image: ${enteredText}`);
+      speakText(`I've created an image based on your prompt: ${enteredText}`);
+    } else {
+      // Handle text responses
+      setRez(response1);
+      speakText(response1);
+    }
 
     const selectedConversation = conversations.find(
       (conversation) => conversation.id === selectedConversationId
@@ -49,7 +66,8 @@ function App() {
 
     if (!selectedConversation) return;
 
-    const newHistory = `${selectedConversation.history} Response: ${response1}`;
+    const responseText = imageData ? `Generated image: ${enteredText}` : response1;
+    const newHistory = `${selectedConversation.history} Response: ${responseText}`;
     const updatedConversations = conversations.map((conversation) =>
       conversation.id === selectedConversationId
         ? { ...conversation, history: newHistory }
@@ -57,18 +75,15 @@ function App() {
     );
 
     localStorage.setItem('conversations', JSON.stringify(updatedConversations));
-    speakText(response1);
   };
 
   const {
     conversations,
-    thisConversation,
     handleAddConversation,
     handleRenameConversation,
     handleDeleteConversation,
     clearConversationHistory,
     handleGreeting,
-    createAndSelectConversation,
     downloadConvo,
     setThisConversation
   } = useConversations(API_KEY, setRez, handleResponse);
@@ -89,8 +104,8 @@ function App() {
   }, []);
 
   const sendStop = () => {
-    setIsTextCleared(prev => !prev);
     setRez('');
+    setGeneratedImage(null);
     stopSpeakText();
   };
 
@@ -99,7 +114,10 @@ function App() {
   };
 
   return (
-    <div className="App">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black relative overflow-x-hidden">
+      {/* Background Effects */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(17,24,39,0.8),rgba(0,0,0,1))] pointer-events-none" />
+
       <SidePanel
         onSelectConversation={handleSelectConversation}
         onAddConversation={handleAddConversation}
@@ -109,68 +127,125 @@ function App() {
         selectedConversationId={selectedConversationId}
         conversations={conversations}
       />
-  
-      {isOverlayVisible && (
-        <ConversationOverlay
-          conversation={conversations.find(c => c.id === selectedConversationId)}
-          onClose={handleOverlayClose}
-        />
-      )}
-  
-      <header className="App-header">
-        <h1 style={{ color: 'lightgrey', marginTop: '2vh' }}>ΩmnÎbot-βeta</h1>
-  
-        <AudioControls
-          windowWidth={windowWidth}
-          isPlaying={isPlaying}
-          showPlayPause={showPlayPause}
-          startRecording={startRecording}
-          sendStop={sendStop}
-          stopSpeakText={stopSpeakText}
-          toggleMute={toggleMute}
-          pause={pause}
-          setRez={setRez}
-          setEnteredText={setEnteredText}
-          setShowPlayPause={setShowPlayPause}
-          setIsPlaying={setIsPlaying}
-        />
-  
-        <ImageUpload
-          sendStop={sendStop}
-          isTextCleared={isTextCleared}
-          setRez={setRez}
-          rez={rez}
-          handleResponse={handleResponse}
-        />
-  
-        <ConversationInput
-          enteredText={enteredText}
-          setEnteredText={setEnteredText}
-          handleGreeting={handleGreeting}
-          sendStop={sendStop}
-          clearConversationHistory={clearConversationHistory}
-          downloadConvo={downloadConvo}
-          rez={rez}
-        />
-  
-        {rez && (
-          <div style={{
-            color: "lightgrey",
-            fontSize: '1.2rem',
-            maxHeight: "50vh",
-            overflow: "auto",
-            width: "100%",
-            margin: 'auto',
-            marginTop: '1%',
-            fontWeight: 'bold',
-            textAlign: 'center',
-            whiteSpace: 'pre-wrap',
-            zIndex: 3000,
-          }}>
-            {rez}
-          </div>
+
+      <AnimatePresence>
+        {isOverlayVisible && (
+          <ConversationOverlay
+            conversation={conversations.find(c => c.id === selectedConversationId)}
+            onClose={handleOverlayClose}
+          />
         )}
-      </header>
+      </AnimatePresence>
+
+      {/* Modern Image Sidebar */}
+      <ModernImageSidebar
+        sessionImages={sessionImages}
+        onImageSelect={setGeneratedImage}
+        generatedImage={generatedImage}
+      />
+
+      <main className="min-h-screen flex flex-col items-center justify-center p-4 relative z-10">
+        {/* Modern Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, type: "spring" }}
+          className="text-center mb-8"
+        >
+          <h1 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-blue-400 via-purple-500 to-cyan-400 bg-clip-text text-transparent mb-4">
+            ΩmnÎbot
+          </h1>
+          <p className="text-gray-400 text-lg">
+            Intelligent conversations with image generation
+          </p>
+        </motion.div>
+
+        {/* Audio Controls */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          className="mb-8"
+        >
+          <AudioControls
+            windowWidth={windowWidth}
+            isPlaying={isPlaying}
+            showPlayPause={showPlayPause}
+            startRecording={startRecording}
+            sendStop={sendStop}
+            stopSpeakText={stopSpeakText}
+            toggleMute={toggleMute}
+            pause={pause}
+            setRez={setRez}
+            setEnteredText={setEnteredText}
+            setShowPlayPause={setShowPlayPause}
+            setIsPlaying={setIsPlaying}
+          />
+        </motion.div>
+
+        {/* Modern Unified Input */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.4 }}
+          className="w-full max-w-4xl mb-8"
+        >
+          <ModernUnifiedInput
+            enteredText={enteredText}
+            setEnteredText={setEnteredText}
+            handleResponse={handleResponse}
+            sendStop={sendStop}
+            clearConversationHistory={clearConversationHistory}
+            downloadConvo={downloadConvo}
+            rez={rez}
+            handleGreeting={handleGreeting}
+          />
+        </motion.div>
+
+        {/* Response Display */}
+        <AnimatePresence>
+          {rez && (
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.95 }}
+              transition={{ duration: 0.4 }}
+              className="w-full max-w-4xl"
+            >
+              <div className="glass-dark p-6 rounded-xl text-gray-100 text-lg leading-relaxed max-h-96 overflow-y-auto">
+                <div className="whitespace-pre-wrap font-medium">
+                  {rez}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Generated Image Display */}
+        <AnimatePresence>
+          {generatedImage && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.5, type: "spring" }}
+              className="mt-8 cursor-pointer"
+              onClick={() => setGeneratedImage(null)}
+            >
+              <div className="glass-dark p-4 rounded-2xl">
+                <img
+                  src={generatedImage}
+                  alt="Generated"
+                  className="max-w-full max-h-96 rounded-xl shadow-2xl object-contain"
+                />
+                <p className="text-center text-gray-400 text-sm mt-3">
+                  Click to close • Generated with AI
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </main>
     </div>
   );
 }

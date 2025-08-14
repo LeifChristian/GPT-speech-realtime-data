@@ -550,4 +550,60 @@ router.post('/greeting', async (req, res) => {
   }
 });
 
+// Prompt classification endpoint
+router.post('/classify', async (req, res) => {
+  const { prompt } = req.body;
+  const openai = req.app.locals.openai;
+
+  if (!prompt) {
+    return res.status(400).json({ error: 'No prompt provided' });
+  }
+
+  try {
+    const messages = [
+      {
+        role: 'system',
+        content: `You are a prompt classifier. Analyze the user's prompt and determine if they want:
+        1. "image_generation" - if they're asking to create, generate, draw, make, produce an image/picture/artwork
+        2. "text" - for any other request (questions, conversations, explanations, etc.)
+        
+        Respond with ONLY one word: either "image_generation" or "text"
+        
+        Examples:
+        - "Draw a cat" → image_generation
+        - "Create a picture of a sunset" → image_generation
+        - "Generate an image of a robot" → image_generation
+        - "What is the weather today?" → text
+        - "Explain quantum physics" → text
+        - "Help me write code" → text`
+      },
+      {
+        role: 'user',
+        content: prompt
+      }
+    ];
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-3.5-turbo',
+      messages: messages,
+      max_tokens: 10,
+      temperature: 0
+    });
+
+    const classification = response.choices[0].message.content.trim().toLowerCase();
+
+    // Validate the response
+    if (classification === 'image_generation' || classification === 'text') {
+      res.json({ type: classification });
+    } else {
+      // Default to text if unclear
+      res.json({ type: 'text' });
+    }
+  } catch (error) {
+    console.error('Classification error:', error.message);
+    // Default to text on error
+    res.json({ type: 'text' });
+  }
+});
+
 module.exports = router;
