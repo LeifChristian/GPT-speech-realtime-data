@@ -87,11 +87,11 @@ const ModernSidePanel = ({
                 </Button>
             </motion.div>
 
-            {/* Overlay for mobile */}
+            {/* Overlay: click outside closes (all viewports) */}
             <AnimatePresence>
                 {isOpen && (
                     <motion.div
-                        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 md:hidden"
+                        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
                         variants={overlayVariants}
                         initial="closed"
                         animate="open"

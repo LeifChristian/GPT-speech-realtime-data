@@ -20,6 +20,7 @@ function App() {
   const [selectedConversationId, setSelectedConversationId] = useState(null);
   const [generatedImage, setGeneratedImage] = useState(null);
   const [sessionImages, setSessionImages] = useState([]);
+  const [currentConversationName, setCurrentConversationName] = useState('');
 
   // Speech controls are initialized after we get handleGreeting from conversations
 
@@ -75,7 +76,8 @@ function App() {
     clearConversationHistory,
     handleGreeting,
     downloadConvo,
-    setThisConversation
+    setThisConversation,
+    handleSelectConversation: selectConversation
   } = useConversations(API_KEY, setRez, handleResponse);
 
   // Now that handleGreeting is defined, wire up speech controls with correct args
@@ -91,11 +93,17 @@ function App() {
     setIsPlaying
   } = useSpeech(setRez, handleGreeting, setEnteredText);
 
-  // New method for handling conversation selection
-  const handleSelectConversation = (conversationId, conversation) => {
+  // New method for handling conversation selection (sync with hook state)
+  const onSelectConversation = (conversationId, conversation) => {
+    // Update local UI state
     setSelectedConversationId(conversationId);
     setThisConversation(conversation);
+    setCurrentConversationName(conversation?.name || '');
     setIsOverlayVisible(true);
+    // Sync with hook's internal selection so features like Save work
+    if (typeof selectConversation === 'function') {
+      selectConversation(conversationId, conversation);
+    }
   };
 
   usePasswordProtection();
@@ -160,7 +168,7 @@ function App() {
       <div className="absolute inset-0 bg-gradient-to-br from-gray-900/30 via-gray-800/40 to-black/60 pointer-events-none" />
 
       <ModernSidePanel
-        onSelectConversation={handleSelectConversation}
+        onSelectConversation={onSelectConversation}
         onAddConversation={handleAddConversation}
         onRenameConversation={handleRenameConversation}
         onDeleteConversation={handleDeleteConversation}
@@ -186,6 +194,12 @@ function App() {
       />
 
       <main className="min-h-screen flex flex-col items-center justify-center p-4 relative z-10">
+        {/* Current conversation name */}
+        {currentConversationName && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 text-white font-bold text-lg">
+            {currentConversationName}
+          </div>
+        )}
         {/* Modern Header */}
         <motion.div
           initial={{ opacity: 0, y: -30 }}
