@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import "./App.css";
-import SidePanel from "./components/SidePanel";
-import ConversationOverlay from "./components/ConversationOverlay";
+import ModernSidePanel from "./components/ModernSidePanel";
+import ModernConversationOverlay from "./components/ModernConversationOverlay";
 import AudioControls from "./components/AudioControls";
 import ModernUnifiedInput from "./components/ModernUnifiedInput";
 import ModernImageSidebar from "./components/ModernImageSidebar";
@@ -103,6 +103,44 @@ function App() {
     return () => window.removeEventListener("resize", handleWindowResize);
   }, []);
 
+  // Create test conversations if none exist
+  useEffect(() => {
+    // Clear old conversations first for testing
+    const existingConversations = JSON.parse(localStorage.getItem('conversations') || '[]');
+    console.log('Existing conversations on load:', existingConversations);
+
+    if (existingConversations.length === 0) {
+      console.log('Creating test conversations...');
+      const testConversations = [
+        {
+          id: "test_welcome_" + Date.now(),
+          name: "Welcome Chat",
+          history: "Question: Hello there! Response: Hi! Welcome to ΩmnÎbot! I can help with conversations and create images. How can I assist you today? Question: That's great! Response: I'm glad you're excited! Feel free to ask me anything or request an image to be generated."
+        },
+        {
+          id: "test_image_" + Date.now() + 1,
+          name: "Image Generation Demo",
+          history: "Question: Can you draw a cyberpunk city? Response: Generated image: A stunning cyberpunk cityscape with neon lights and futuristic architecture. Question: That looks amazing! Response: I'm glad you like it! The cyberpunk aesthetic with neon lights and towering buildings creates such a cool atmosphere."
+        },
+        {
+          id: "test_ai_" + Date.now() + 2,
+          name: "AI Discussion",
+          history: "Question: What is artificial intelligence? Response: Artificial intelligence (AI) is a branch of computer science that aims to create systems capable of performing tasks that typically require human intelligence, such as learning, reasoning, problem-solving, and perception. Question: Can you give examples? Response: Sure! Examples include virtual assistants like Siri and Alexa, recommendation systems, autonomous vehicles, medical diagnosis systems, and language models like myself."
+        }
+      ];
+
+      localStorage.setItem('conversations', JSON.stringify(testConversations));
+      console.log('✅ Created test conversations:', testConversations);
+
+      // Force page reload to ensure conversations are loaded
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+    } else {
+      console.log('Using existing conversations:', existingConversations);
+    }
+  }, []);
+
   const sendStop = () => {
     setRez('');
     setGeneratedImage(null);
@@ -118,7 +156,7 @@ function App() {
       {/* Background Effects */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(17,24,39,0.8),rgba(0,0,0,1))] pointer-events-none" />
 
-      <SidePanel
+      <ModernSidePanel
         onSelectConversation={handleSelectConversation}
         onAddConversation={handleAddConversation}
         onRenameConversation={handleRenameConversation}
@@ -130,7 +168,7 @@ function App() {
 
       <AnimatePresence>
         {isOverlayVisible && (
-          <ConversationOverlay
+          <ModernConversationOverlay
             conversation={conversations.find(c => c.id === selectedConversationId)}
             onClose={handleOverlayClose}
           />

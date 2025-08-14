@@ -10,6 +10,17 @@ export const useConversations = (apiKey, setRez, handleResponse) => {
     setConversations(storedConversations);
   }, []);
 
+  // Listen for storage events to refresh conversations
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const storedConversations = JSON.parse(localStorage.getItem('conversations') || '[]');
+      setConversations(storedConversations);
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   useEffect(() => {
     console.log('Conversations updated:', conversations);
     console.log('Selected conversation ID:', selectedConversationId);
@@ -28,7 +39,7 @@ export const useConversations = (apiKey, setRez, handleResponse) => {
     localStorage.setItem('conversations', JSON.stringify(updatedConversations));
     setSelectedConversationId(newConversation.id);
     setThisConversation(newConversation);
-    
+
     return newConversation;
   };
 
@@ -41,7 +52,7 @@ export const useConversations = (apiKey, setRez, handleResponse) => {
       minute: 'numeric',
       hour12: true
     }).replace(',', '');
-    
+
     const newConversation = {
       id: Date.now().toString(),
       name: `Conv_${formattedDate}`,
@@ -50,7 +61,7 @@ export const useConversations = (apiKey, setRez, handleResponse) => {
 
     const updatedConversations = [...conversations, newConversation];
     localStorage.setItem('conversations', JSON.stringify(updatedConversations));
-    
+
     setConversations(updatedConversations);
     setSelectedConversationId(newConversation.id);
     setThisConversation(newConversation);
@@ -59,12 +70,12 @@ export const useConversations = (apiKey, setRez, handleResponse) => {
   };
 
   // hooks/useConversations.js
-// ... other code remains the same ...
+  // ... other code remains the same ...
 
-const handleGreeting = async (theStuff) => {
+  const handleGreeting = async (theStuff) => {
     try {
       let currentConversation;
-      
+
       if (!selectedConversationId) {
         currentConversation = await createAndSelectConversation();
         const storedConversations = JSON.parse(localStorage.getItem('conversations') || '[]');
@@ -76,7 +87,7 @@ const handleGreeting = async (theStuff) => {
         currentConversation = conversations.find(
           conv => conv.id === selectedConversationId
         );
-        
+
         if (!currentConversation) {
           currentConversation = await createAndSelectConversation();
         }
@@ -88,7 +99,7 @@ const handleGreeting = async (theStuff) => {
       }
 
       const existingHistory = currentConversation.history || '';
-      const newMessage = existingHistory 
+      const newMessage = existingHistory
         ? `${existingHistory} Question: ${theStuff}`
         : `Question: ${theStuff}`;
 
@@ -108,10 +119,10 @@ const handleGreeting = async (theStuff) => {
       if (response.ok) {
         const responseData = await response.json();
         const reply = responseData.reply;
-        
+
         // Update the UI text
         setRez(reply);
-        
+
         // Speak the response
         handleResponse(reply);
 
@@ -122,7 +133,7 @@ const handleGreeting = async (theStuff) => {
         };
 
         const latestStoredConversations = JSON.parse(localStorage.getItem('conversations') || '[]');
-        const finalUpdatedConversations = latestStoredConversations.map(conv => 
+        const finalUpdatedConversations = latestStoredConversations.map(conv =>
           conv.id === updatedConversation.id ? updatedConversation : conv
         );
 
