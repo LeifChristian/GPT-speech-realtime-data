@@ -21,17 +21,7 @@ function App() {
   const [generatedImage, setGeneratedImage] = useState(null);
   const [sessionImages, setSessionImages] = useState([]);
 
-  const {
-    startRecording,
-    isPlaying,
-    showPlayPause,
-    speakText,
-    stopSpeakText,
-    toggleMute,
-    pause,
-    setShowPlayPause,
-    setIsPlaying
-  } = useSpeech(setRez, setEnteredText);
+  // Speech controls are initialized after we get handleGreeting from conversations
 
   const handleResponse = (response1, bool, imageData = null) => {
     if (bool) {
@@ -87,6 +77,19 @@ function App() {
     downloadConvo,
     setThisConversation
   } = useConversations(API_KEY, setRez, handleResponse);
+
+  // Now that handleGreeting is defined, wire up speech controls with correct args
+  const {
+    startRecording,
+    isPlaying,
+    showPlayPause,
+    speakText,
+    stopSpeakText,
+    toggleMute,
+    pause,
+    setShowPlayPause,
+    setIsPlaying
+  } = useSpeech(setRez, handleGreeting, setEnteredText);
 
   // New method for handling conversation selection
   const handleSelectConversation = (conversationId, conversation) => {
@@ -152,9 +155,9 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black relative overflow-x-hidden">
-      {/* Background Effects */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(17,24,39,0.8),rgba(0,0,0,1))] pointer-events-none" />
+    <div className="min-h-screen relative overflow-x-hidden">
+      {/* Background Effects - semi-transparent gradient over Matrix image */}
+      <div className="absolute inset-0 bg-gradient-to-br from-gray-900/30 via-gray-800/40 to-black/60 pointer-events-none" />
 
       <ModernSidePanel
         onSelectConversation={handleSelectConversation}
@@ -190,7 +193,7 @@ function App() {
           transition={{ duration: 0.8, type: "spring" }}
           className="text-center mb-8"
         >
-          <h1 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-blue-400 via-purple-500 to-cyan-400 bg-clip-text text-transparent mb-4">
+          <h1 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-blue-300 via-purple-300 to-cyan-300 bg-clip-text text-transparent mb-4">
             ΩmnÎbot
           </h1>
           <p className="text-gray-400 text-lg">
