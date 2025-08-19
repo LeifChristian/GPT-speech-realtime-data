@@ -2,14 +2,14 @@
 const express = require('express');
 const router = express.Router();
 const { checkImageAuth } = require('../middleware/authMiddleware');
-const { 
-  upload, 
-  handleUploadError, 
-  validateUpload 
+const {
+  upload,
+  handleUploadError,
+  validateUpload
 } = require('../middleware/uploadMiddleware');
 
 // Image analysis endpoint
-router.post('/analyze', 
+router.post('/analyze',
   upload.single('file'),
   handleUploadError,
   validateUpload,
@@ -22,8 +22,9 @@ router.post('/analyze',
 
     try {
       const base64Image = file.buffer.toString('base64');
+      const model = (req.app.locals.models && req.app.locals.models.visionModel) || process.env.OPENAI_VISION_MODEL || 'gpt-4o';
       const response = await req.app.locals.openai.chat.completions.create({
-        model: "gpt-4o",
+        model: model,
         messages: [
           {
             role: "user",
@@ -45,7 +46,7 @@ router.post('/analyze',
       console.error('Error:', error.response ? error.response.data : error.message);
       res.status(500).json({ error: 'Failed to process the file' });
     }
-});
+  });
 
 // Image generation endpoint
 router.post('/generate', async (req, res) => {
@@ -56,8 +57,9 @@ router.post('/generate', async (req, res) => {
   }
 
   try {
+    const model = (req.app.locals.models && req.app.locals.models.imageModel) || process.env.OPENAI_IMAGE_MODEL || 'dall-e-3';
     const response = await req.app.locals.openai.images.generate({
-      model: "dall-e-3",
+      model: model,
       prompt: prompt,
       n: 1,
       size: "1024x1024",

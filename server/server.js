@@ -15,8 +15,13 @@ const fileRouter = require('./routes/fileRoutes');
 // Initialize express app
 const app = express();
 
-// OpenAI configuration
-const openai = new OpenAI({ apiKey: process.env.openAPIKey });
+// OpenAI configuration (supports OPENAI_API_KEY or legacy openAPIKey)
+const openai = new OpenAI({ apiKey: process.env.openAPIKey || process.env.OPENAI_API_KEY });
+
+// Default model configuration via env vars, with sensible fallbacks
+const DEFAULT_TEXT_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const DEFAULT_VISION_MODEL = process.env.OPENAI_VISION_MODEL || 'gpt-4o';
+const DEFAULT_IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || 'dall-e-3';
 
 // Multer configuration for file uploads
 const storage = multer.memoryStorage();
@@ -26,7 +31,7 @@ const upload = multer({ storage: storage });
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST'],
-  allowedHeaders: ['Content-Type']
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
 app.use(bodyParser.json());
@@ -36,6 +41,13 @@ app.locals.openai = openai;
 
 // Make upload middleware available to routes
 app.locals.upload = upload;
+
+// Expose model choices to routes
+app.locals.models = {
+  textModel: DEFAULT_TEXT_MODEL,
+  visionModel: DEFAULT_VISION_MODEL,
+  imageModel: DEFAULT_IMAGE_MODEL,
+};
 
 // Mount routes
 app.use('/image', imageRouter);
@@ -51,9 +63,9 @@ if (!fs.existsSync(savedConvosPath)) {
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({ 
+  res.status(500).json({
     error: 'Something broke!',
-    message: err.message 
+    message: err.message
   });
 });
 

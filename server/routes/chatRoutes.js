@@ -288,6 +288,7 @@
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
+const OpenAI = require('openai');
 const { checkAuth, checkChatAuth } = require('../middleware/authMiddleware');
 
 // API Function Definitions
@@ -489,27 +490,24 @@ const functions = [
 
 // Chat Routes
 router.post('/greeting', async (req, res) => {
-  const { text, code } = req.body;
-  const openai = req.app.locals.openai;
+  const { text } = req.body;
+  const openai = req.app.locals.openai || new OpenAI({ apiKey: process.env.OPENAI_API_KEY || process.env.openAPIKey });
+  const { textModel } = req.app.locals.models || { textModel: process.env.OPENAI_MODEL || 'gpt-4o-mini' };
 
   try {
     const messages = [{ role: 'user', content: text }];
-    const axiosConfig = {
-      headers: {
-        'Authorization': `Bearer ${process.env.openAPIKey}`,
-      },
-    };
 
-    const response = await axios.post('https://api.openai.com/v1/chat/completions', {
-      model: 'gpt-3.5-turbo-0125',
-      messages: messages,
-      functions: functions,
+    // New SDK call
+    const response = await openai.chat.completions.create({
+      model: textModel,
+      messages,
+      functions,
       function_call: 'auto',
-    }, axiosConfig);
+    });
 
-    if (response?.data?.choices[0]?.message?.function_call) {
-      const function_name = response.data.choices[0].message.function_call.name;
-      const function_args = JSON.parse(response.data.choices[0].message.function_call.arguments);
+    if (response?.choices?.[0]?.message?.function_call) {
+      const function_name = response.choices[0].message.function_call.name;
+      const function_args = JSON.parse(response.choices[0].message.function_call.arguments || '{}');
 
       let function_response;
       if (function_name === 'get_current_weather') {
@@ -526,26 +524,22 @@ router.post('/greeting', async (req, res) => {
         function_response = `Unsupported function: ${function_name}`;
       }
 
-      messages.push(response.data.choices[0].message);
-      messages.push({
-        role: 'function',
-        name: function_name,
-        content: function_response,
+      messages.push(response.choices[0].message);
+      messages.push({ role: 'function', name: function_name, content: function_response });
+
+      const followup = await openai.chat.completions.create({
+        model: textModel,
+        messages,
       });
 
-      const second_response = await axios.post('https://api.openai.com/v1/chat/completions', {
-        model: 'gpt-3.5-turbo-0125',
-        messages: messages,
-      }, axiosConfig);
-
-      let reply = second_response.data.choices[0].message.content;
+      const reply = followup.choices[0].message.content;
       res.json({ reply });
     } else {
-      let reply = response.data.choices[0].message.content;
+      const reply = response.choices[0].message.content;
       res.json({ reply });
     }
   } catch (error) {
-    console.error('Error:', error.message);
+    console.error('Error:', error.response?.data || error.message);
     res.status(500).json({ error: 'Error processing text' });
   }
 });
@@ -584,7 +578,7 @@ router.post('/classify', async (req, res) => {
     ];
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
+      model: (req.app.locals.models && req.app.locals.models.textModel) || process.env.OPENAI_MODEL || 'gpt-4o-mini',
       messages: messages,
       max_tokens: 10,
       temperature: 0
