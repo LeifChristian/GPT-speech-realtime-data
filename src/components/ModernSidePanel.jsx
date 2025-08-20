@@ -151,7 +151,7 @@ const ModernSidePanel = ({
                                                 initial={{ opacity: 0, x: -20 }}
                                                 animate={{ opacity: 1, x: 0 }}
                                                 transition={{ duration: 0.2 }}
-                                                className={`group p-3 rounded-lg cursor-pointer transition-all duration-200 ${conversation.id === selectedConversationId
+                                                className={`group relative overflow-hidden p-3 rounded-lg cursor-pointer transition-all duration-200 ${conversation.id === selectedConversationId
                                                     ? 'bg-blue-600/20 border border-blue-500/30'
                                                     : 'hover:bg-white/10 border border-transparent'
                                                     }`}
@@ -160,7 +160,10 @@ const ModernSidePanel = ({
                                                     handleSelectConversation(conversation.id, conversation);
                                                 }}
                                             >
-                                                <div className="flex items-center justify-between">
+                                                {conversation.id === selectedConversationId && (
+                                                    <div className="absolute inset-0 bg-white/10 backdrop-blur-[1px] pointer-events-none" />
+                                                )}
+                                                <div className="relative z-10 flex items-center justify-between">
                                                     <div className="flex-1 min-w-0">
                                                         <h3 className="text-white font-medium truncate">
                                                             {conversation.name}

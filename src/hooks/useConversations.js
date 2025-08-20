@@ -103,6 +103,19 @@ export const useConversations = (apiKey, setRez, handleResponse) => {
         ? `${existingHistory} Question: ${theStuff}`
         : `Question: ${theStuff}`;
 
+      // Persist the question into history before sending
+      const updatedWithQuestion = {
+        ...currentConversation,
+        history: newMessage,
+      };
+      const conversationsWithQuestion = conversations.map((conv) =>
+        conv.id === updatedWithQuestion.id ? updatedWithQuestion : conv
+      );
+      localStorage.setItem('conversations', JSON.stringify(conversationsWithQuestion));
+      setConversations(conversationsWithQuestion);
+      setThisConversation(updatedWithQuestion);
+      setSelectedConversationId(updatedWithQuestion.id);
+
       const payload = {
         text: `${newMessage} <-- Text before this sentence is conversation history so far between you and me. Do NOT include timestamps in responses, timestamps provide context for when this conversation is taking place. responses will be spoken back to user using TTS. Using this information and context, answer the following question, calling functions if asked current information -->  "${theStuff}"`,
         code: apiKey,
@@ -125,22 +138,6 @@ export const useConversations = (apiKey, setRez, handleResponse) => {
 
         // Speak the response
         handleResponse(reply);
-
-        const newUpdatedHistory = `${newMessage} Response: ${reply}`;
-        const updatedConversation = {
-          ...currentConversation,
-          history: newUpdatedHistory
-        };
-
-        const latestStoredConversations = JSON.parse(localStorage.getItem('conversations') || '[]');
-        const finalUpdatedConversations = latestStoredConversations.map(conv =>
-          conv.id === updatedConversation.id ? updatedConversation : conv
-        );
-
-        localStorage.setItem('conversations', JSON.stringify(finalUpdatedConversations));
-        setConversations(finalUpdatedConversations);
-        setThisConversation(updatedConversation);
-        setSelectedConversationId(updatedConversation.id);
       }
     } catch (error) {
       console.error("Error -->", error);
@@ -150,6 +147,30 @@ export const useConversations = (apiKey, setRez, handleResponse) => {
   const handleSelectConversation = (conversationId, conversationObject) => {
     setSelectedConversationId(conversationId);
     setThisConversation(conversationObject);
+  };
+
+  const appendResponseToHistory = async (responseText) => {
+    let workingConversationId = selectedConversationId;
+    let selectedConversation = conversations.find(
+      (conversation) => conversation.id === workingConversationId
+    );
+    if (!selectedConversation) {
+      const created = await createAndSelectConversation();
+      workingConversationId = created.id;
+      selectedConversation = created;
+    }
+    const newHistory = `${selectedConversation.history} Response: ${responseText}`;
+    const updatedConversation = {
+      ...selectedConversation,
+      history: newHistory,
+    };
+    const updatedConversations = conversations.map((conversation) =>
+      conversation.id === workingConversationId ? updatedConversation : conversation
+    );
+    setConversations(updatedConversations);
+    localStorage.setItem('conversations', JSON.stringify(updatedConversations));
+    setThisConversation(updatedConversation);
+    setSelectedConversationId(workingConversationId);
   };
 
   const handleRenameConversation = (conversationId) => {
@@ -240,6 +261,7 @@ export const useConversations = (apiKey, setRez, handleResponse) => {
     handleGreeting,
     createAndSelectConversation,
     downloadConvo,
-    setThisConversation
+    setThisConversation,
+    appendResponseToHistory
   };
 };

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { MessageSquare } from "lucide-react";
 import "./App.css";
 import ModernSidePanel from "./components/ModernSidePanel";
 import ModernConversationOverlay from "./components/ModernConversationOverlay";
@@ -9,6 +10,7 @@ import ModernImageSidebar from "./components/ModernImageSidebar";
 import { useConversations } from "./hooks/useConversations";
 import { useSpeech } from "./hooks/useSpeech";
 import { usePasswordProtection } from "./hooks/usePasswordProtection";
+import { Button } from "./components/ui/Button";
 
 const API_KEY = process.env.REACT_APP_API_KEY;
 
@@ -50,22 +52,9 @@ function App() {
       setRez(response1);
       speakText(response1);
     }
-
-    const selectedConversation = conversations.find(
-      (conversation) => conversation.id === selectedConversationId
-    );
-
-    if (!selectedConversation) return;
-
     const responseText = imageData ? `Generated image: ${enteredText}` : response1;
-    const newHistory = `${selectedConversation.history} Response: ${responseText}`;
-    const updatedConversations = conversations.map((conversation) =>
-      conversation.id === selectedConversationId
-        ? { ...conversation, history: newHistory }
-        : conversation
-    );
-
-    localStorage.setItem('conversations', JSON.stringify(updatedConversations));
+    // Persist response to the selected conversation
+    appendResponseToHistory(responseText);
   };
 
   const {
@@ -77,7 +66,8 @@ function App() {
     handleGreeting,
     downloadConvo,
     setThisConversation,
-    handleSelectConversation: selectConversation
+    handleSelectConversation: selectConversation,
+    appendResponseToHistory
   } = useConversations(API_KEY, setRez, handleResponse);
 
   // Now that handleGreeting is defined, wire up speech controls with correct args
@@ -105,6 +95,12 @@ function App() {
       selectConversation(conversationId, conversation);
     }
   };
+
+  // Keep header name in sync with selection and rename updates
+  useEffect(() => {
+    const selected = conversations.find(c => c.id === selectedConversationId);
+    setCurrentConversationName(selected?.name || '');
+  }, [conversations, selectedConversationId]);
 
   usePasswordProtection();
 
@@ -166,6 +162,21 @@ function App() {
     <div className="min-h-screen relative overflow-x-hidden">
       {/* Background Effects - semi-transparent gradient over Matrix image */}
       <div className="absolute inset-0 bg-gradient-to-br from-gray-900/30 via-gray-800/40 to-black/60 pointer-events-none" />
+
+      {/* Toggle Conversation History Button (top-right) */}
+      <motion.div className="fixed top-4 right-4 z-50" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+        <Button
+          variant="glass"
+          size="icon"
+          onClick={() => setIsOverlayVisible((v) => !v)}
+          disabled={!selectedConversationId}
+          className="text-white border-white/20"
+          aria-label="Toggle conversation history"
+          title={selectedConversationId ? "Show/Hide Conversation History" : "Select a conversation to view history"}
+        >
+          <MessageSquare className="h-5 w-5" />
+        </Button>
+      </motion.div>
 
       <ModernSidePanel
         onSelectConversation={onSelectConversation}
