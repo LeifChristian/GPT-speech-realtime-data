@@ -324,12 +324,17 @@ async function get_current_weather(location, unit = 'imperial') {
 }
 
 async function get_news(query) {
-  const apiKey = process.env.newsAPIKey;
+  const apiKey = process.env.newsAPIKey || process.env.NEWS_API_KEY || process.env.NEWSDATA_API_KEY;
   const searchTerm = encodeURIComponent(query);
   const apiBase = "https://newsdata.io/api/1/news";
   const url = `${apiBase}?apikey=${apiKey}&q=${searchTerm}`;
 
   try {
+    if (!apiKey) {
+      console.error('[NEWS] Missing API key. Set newsAPIKey or NEWS_API_KEY');
+      return 'Error: News API key is not configured on the server.';
+    }
+    console.log(`[NEWS] GET ${url}`);
     const response = await axios.get(url);
     let result = '';
     if (response.data.status === "success" && response.data.results) {
@@ -339,10 +344,10 @@ async function get_news(query) {
         result += `Published Date: ${article.pubDate}\n\n`;
       });
     }
-    return result;
+    return result || 'No news found for that query.';
   } catch (error) {
-    console.log(error);
-    return null;
+    console.error('[NEWS] Error', { status: error.response?.status, data: error.response?.data, message: error.message });
+    return `Error fetching news: ${error.response?.status || ''}`.trim();
   }
 }
 
@@ -387,29 +392,37 @@ async function get_shows(query) {
 }
 
 async function get_realtime_data(query) {
-  const subscriptionKey = process.env.bingAPIKey;
+  const subscriptionKey = process.env.bingAPIKey || process.env.BING_API_KEY || process.env.BINGAPIKEY;
   const uriBase = "https://api.bing.microsoft.com/v7.0/search";
-  const searchTerm = encodeURIComponent(query);
+  const searchTerm = encodeURIComponent(query || "");
   const url = `${uriBase}?q=${searchTerm}&count=20&mkt=en-US`;
 
+  if (!subscriptionKey) {
+    console.error('[BING] Missing API key. Set env var bingAPIKey or BING_API_KEY. Query=', query);
+    return 'Error: Bing API key is not configured on the server.';
+  }
+
   try {
+    console.log(`[BING] GET ${url}`);
     const response = await axios.get(url, {
-      headers: {
-        'Ocp-Apim-Subscription-Key': subscriptionKey
-      }
+      headers: { 'Ocp-Apim-Subscription-Key': subscriptionKey },
+      timeout: 10000,
     });
 
     let result = '';
-    if (response.data.webPages && response.data.webPages.value) {
-      response.data.webPages.value.forEach(webPage => {
+    if (response?.data?.webPages?.value) {
+      response.data.webPages.value.forEach((webPage) => {
         result += `Name: ${webPage.name}\n`;
         result += `Snippet: ${webPage.snippet}\n\n`;
       });
     }
-    return result;
+    console.log(`[BING] Results: ${response?.data?.webPages?.value?.length || 0} items`);
+    return result || 'No results found.';
   } catch (error) {
-    console.log(error);
-    return null;
+    const status = error.response?.status;
+    const data = error.response?.data;
+    console.error('[BING] Error', { status, data, message: error.message });
+    return `Error fetching search results: ${status || ''}`.trim();
   }
 }
 
@@ -495,6 +508,7 @@ router.post('/greeting', async (req, res) => {
   const { textModel } = req.app.locals.models || { textModel: process.env.OPENAI_MODEL || 'gpt-4o-mini' };
 
   try {
+    console.log('[CHAT] /greeting request', { textPreview: typeof text === 'string' ? text.slice(0, 200) : typeof text });
     const messages = [{ role: 'user', content: text }];
 
     // New SDK call
@@ -508,6 +522,7 @@ router.post('/greeting', async (req, res) => {
     if (response?.choices?.[0]?.message?.function_call) {
       const function_name = response.choices[0].message.function_call.name;
       const function_args = JSON.parse(response.choices[0].message.function_call.arguments || '{}');
+      console.log('[CHAT] function_call', { function_name, function_args });
 
       let function_response;
       if (function_name === 'get_current_weather') {
@@ -523,9 +538,10 @@ router.post('/greeting', async (req, res) => {
       } else {
         function_response = `Unsupported function: ${function_name}`;
       }
+      console.log('[CHAT] function_response length', function_response ? String(function_response).length : 0);
 
       messages.push(response.choices[0].message);
-      messages.push({ role: 'function', name: function_name, content: function_response });
+      messages.push({ role: 'function', name: function_name, content: typeof function_response === 'string' ? function_response : JSON.stringify(function_response ?? '') });
 
       const followup = await openai.chat.completions.create({
         model: textModel,
@@ -539,7 +555,7 @@ router.post('/greeting', async (req, res) => {
       res.json({ reply });
     }
   } catch (error) {
-    console.error('Error:', error.response?.data || error.message);
+    console.error('[CHAT] /greeting error', { message: error.message, data: error.response?.data, stack: error.stack });
     res.status(500).json({ error: 'Error processing text' });
   }
 });

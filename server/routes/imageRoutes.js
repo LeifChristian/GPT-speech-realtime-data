@@ -7,6 +7,7 @@ const {
   handleUploadError,
   validateUpload
 } = require('../middleware/uploadMiddleware');
+const axios = require('axios');
 
 // Image analysis endpoint
 router.post('/analyze',
@@ -73,3 +74,37 @@ router.post('/generate', async (req, res) => {
 });
 
 module.exports = router;
+
+// Secure proxy download to bypass browser CORS when saving generated images
+router.get('/download', async (req, res) => {
+  try {
+    const { url } = req.query;
+    if (!url) {
+      return res.status(400).json({ error: 'Missing url parameter' });
+    }
+
+    // Basic allowlist to mitigate SSRF risk
+    const parsed = new URL(url);
+    const allowedHosts = [
+      'oaidalleapiprodscus.blob.core.windows.net',
+      'oaidalleapiprodscusnorthcentralus.blob.core.windows.net',
+      'oaidalleapiprodscuseast.blob.core.windows.net',
+      'aiinfra-sa-prod-eastus-blob.blob.core.windows.net',
+    ];
+    if (!allowedHosts.some((h) => parsed.hostname === h || parsed.hostname.endsWith('.blob.core.windows.net'))) {
+      return res.status(400).json({ error: 'Host not allowed for download' });
+    }
+
+    const response = await axios.get(url, { responseType: 'stream' });
+    const contentType = response.headers['content-type'] || 'application/octet-stream';
+    const extension = contentType.includes('png') ? 'png' : contentType.includes('jpeg') ? 'jpg' : 'img';
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="generated-image-${Date.now()}.${extension}"`);
+
+    response.data.pipe(res);
+  } catch (err) {
+    console.error('Image download proxy error:', err.message);
+    res.status(500).json({ error: 'Failed to download image' });
+  }
+});

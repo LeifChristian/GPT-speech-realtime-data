@@ -71,7 +71,8 @@ function App() {
 
   const downloadCurrentImage = async (url) => {
     try {
-      const response = await fetch(url);
+      const response = await fetch(`http://localhost:3001/image/download?url=${encodeURIComponent(url)}`);
+      if (!response.ok) throw new Error('Proxy download failed');
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -192,8 +193,8 @@ function App() {
       {/* Background Effects - semi-transparent gradient over Matrix image */}
       <div className="absolute inset-0 bg-gradient-to-br from-gray-900/30 via-gray-800/40 to-black/60 pointer-events-none" />
 
-      {/* Toggle Conversation History Button (top-right) */}
-      <motion.div className="fixed top-4 right-4 z-50" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+      {/* Toggle Conversation History Button (top-right, offset when image sidebar present) */}
+      <motion.div className={`fixed top-4 ${sessionImages.length ? 'right-24' : 'right-4'} z-[60]`} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
         <Button
           variant="glass"
           size="icon"
