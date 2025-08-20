@@ -150,58 +150,7 @@ const ModernImageSidebar = ({ sessionImages = [], onImageSelect, generatedImage 
                 </GlassCard>
             </motion.div>
 
-            {/* Full Screen Image Modal */}
-            <AnimatePresence>
-                {generatedImage && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-black/80 backdrop-blur-sm z-60 flex items-center justify-center p-4"
-                        onClick={() => onImageSelect(null)}
-                    >
-                        <motion.div
-                            initial={{ scale: 0.8, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.8, opacity: 0 }}
-                            transition={{ type: "spring", stiffness: 100 }}
-                            className="relative max-w-4xl max-h-full"
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <img
-                                src={generatedImage}
-                                alt="Generated"
-                                className="w-full h-full object-contain rounded-lg shadow-2xl"
-                            />
-
-                            {/* Close button */}
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => onImageSelect(null)}
-                                className="absolute top-4 right-4 bg-black/50 hover:bg-black/70 text-white"
-                            >
-                                <X className="h-5 w-5" />
-                            </Button>
-
-                            {/* Download button */}
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => {
-                                    const currentImage = sessionImages[selectedImageIndex];
-                                    if (currentImage) {
-                                        downloadImage(currentImage.url, currentImage.prompt);
-                                    }
-                                }}
-                                className="absolute top-4 right-16 bg-black/50 hover:bg-black/70 text-white"
-                            >
-                                <Download className="h-5 w-5" />
-                            </Button>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            {/* Full Screen Image Modal moved to App so sidebar doesn't auto-open */}
         </>
     );
 };

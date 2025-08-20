@@ -173,6 +173,32 @@ export const useConversations = (apiKey, setRez, handleResponse) => {
     setSelectedConversationId(workingConversationId);
   };
 
+  const appendQuestionToHistory = async (questionText) => {
+    let workingConversationId = selectedConversationId;
+    let selectedConversation = conversations.find(
+      (conversation) => conversation.id === workingConversationId
+    );
+    if (!selectedConversation) {
+      const created = await createAndSelectConversation();
+      workingConversationId = created.id;
+      selectedConversation = created;
+    }
+    const newHistory = selectedConversation.history
+      ? `${selectedConversation.history} Question: ${questionText}`
+      : `Question: ${questionText}`;
+    const updatedConversation = {
+      ...selectedConversation,
+      history: newHistory,
+    };
+    const updatedConversations = conversations.map((conversation) =>
+      conversation.id === workingConversationId ? updatedConversation : conversation
+    );
+    setConversations(updatedConversations);
+    localStorage.setItem('conversations', JSON.stringify(updatedConversations));
+    setThisConversation(updatedConversation);
+    setSelectedConversationId(workingConversationId);
+  };
+
   const handleRenameConversation = (conversationId) => {
     const selectedConversation = conversations.find(
       (conversation) => conversation.id === conversationId
@@ -262,6 +288,7 @@ export const useConversations = (apiKey, setRez, handleResponse) => {
     createAndSelectConversation,
     downloadConvo,
     setThisConversation,
-    appendResponseToHistory
+    appendResponseToHistory,
+    appendQuestionToHistory
   };
 };

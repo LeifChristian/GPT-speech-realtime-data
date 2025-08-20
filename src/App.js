@@ -21,7 +21,9 @@ function App() {
   const [isOverlayVisible, setIsOverlayVisible] = useState(false);
   const [selectedConversationId, setSelectedConversationId] = useState(null);
   const [generatedImage, setGeneratedImage] = useState(null);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [sessionImages, setSessionImages] = useState([]);
+  const [conversationThumbnails, setConversationThumbnails] = useState({});
   const [currentConversationName, setCurrentConversationName] = useState('');
 
   // Speech controls are initialized after we get handleGreeting from conversations
@@ -37,6 +39,7 @@ function App() {
     // Handle image responses
     if (imageData && imageData.type === 'image') {
       setGeneratedImage(imageData.content);
+      setIsImageModalOpen(false);
       // Add to session images
       const newImage = {
         id: Date.now(),
@@ -55,6 +58,32 @@ function App() {
     const responseText = imageData ? `Generated image: ${enteredText}` : response1;
     // Persist response to the selected conversation
     appendResponseToHistory(responseText);
+  };
+
+  const addConversationThumbnail = (conversationId, url, prompt) => {
+    if (!conversationId || !url) return;
+    setConversationThumbnails(prev => {
+      const list = prev[conversationId] || [];
+      const newThumb = { id: Date.now(), url, prompt: prompt || '', ts: Date.now() };
+      return { ...prev, [conversationId]: [...list, newThumb] };
+    });
+  };
+
+  const downloadCurrentImage = async (url) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `generated-image-${Date.now()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Download failed:', error);
+    }
   };
 
   const {
@@ -193,6 +222,11 @@ function App() {
           <ModernConversationOverlay
             conversation={conversations.find(c => c.id === selectedConversationId)}
             onClose={handleOverlayClose}
+            handleGreeting={handleGreeting}
+            handleResponse={handleResponse}
+            thumbnails={conversationThumbnails[selectedConversationId] || []}
+            addThumbnail={(url, prompt) => addConversationThumbnail(selectedConversationId, url, prompt)}
+            speakText={speakText}
           />
         )}
       </AnimatePresence>
@@ -200,7 +234,10 @@ function App() {
       {/* Modern Image Sidebar */}
       <ModernImageSidebar
         sessionImages={sessionImages}
-        onImageSelect={setGeneratedImage}
+        onImageSelect={(url) => {
+          setGeneratedImage(url);
+          setIsImageModalOpen(true);
+        }}
         generatedImage={generatedImage}
       />
 
@@ -287,7 +324,7 @@ function App() {
           )}
         </AnimatePresence>
 
-        {/* Generated Image Display */}
+        {/* Generated Image Display (inline card with controls) */}
         <AnimatePresence>
           {generatedImage && (
             <motion.div
@@ -296,7 +333,7 @@ function App() {
               exit={{ opacity: 0, scale: 0.8 }}
               transition={{ duration: 0.5, type: "spring" }}
               className="mt-8 cursor-pointer"
-              onClick={() => setGeneratedImage(null)}
+              onClick={() => setIsImageModalOpen(true)}
             >
               <div className="glass-dark p-4 rounded-2xl">
                 <img
@@ -304,10 +341,72 @@ function App() {
                   alt="Generated"
                   className="max-w-full max-h-96 rounded-xl shadow-2xl object-contain"
                 />
-                <p className="text-center text-gray-400 text-sm mt-3">
-                  Click to close • Generated with AI
-                </p>
+                <div className="flex justify-center gap-4 mt-3 text-gray-300 text-sm">
+                  <button
+                    className="px-3 py-1 rounded-md bg-white/10 hover:bg-white/20"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsImageModalOpen(true);
+                    }}
+                  >
+                    Expand
+                  </button>
+                  <button
+                    className="px-3 py-1 rounded-md bg-white/10 hover:bg-white/20"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setGeneratedImage(null);
+                    }}
+                  >
+                    X
+                  </button>
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      await downloadCurrentImage(generatedImage);
+                    }}
+                    className="px-3 py-1 rounded-md bg-white/10 hover:bg-white/20"
+                  >
+                    Download
+                  </button>
+                </div>
               </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Fullscreen modal for generated image */}
+        <AnimatePresence>
+          {isImageModalOpen && generatedImage && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+              onClick={() => setIsImageModalOpen(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                transition={{ type: "spring", stiffness: 120 }}
+                className="relative max-w-5xl max-h-full"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <img src={generatedImage} alt="Generated" className="w-full h-full object-contain rounded-lg shadow-2xl" />
+                <button
+                  className="absolute top-4 right-4 px-3 py-1 rounded-md bg-white/10 hover:bg-white/20 text-white"
+                  onClick={() => setIsImageModalOpen(false)}
+                >
+                  Close
+                </button>
+                <button
+                  onClick={async () => { await downloadCurrentImage(generatedImage); }}
+                  className="absolute top-4 right-20 px-3 py-1 rounded-md bg-white/10 hover:bg-white/20 text-white"
+                >
+                  Download
+                </button>
+              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>

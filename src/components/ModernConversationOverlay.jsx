@@ -1,13 +1,15 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { X, MessageSquare, User, Bot } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, MessageSquare, User, Bot, ImagePlus, Send } from 'lucide-react';
 import { Button } from './ui/Button';
 import { GlassCard } from './ui/Card';
 
-const ModernConversationOverlay = ({ conversation, onClose }) => {
-    if (!conversation) {
-        return null;
-    }
+const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, handleResponse, thumbnails = [], addThumbnail, speakText }) => {
+    // Local input state (must be declared before any conditional returns)
+    const [inputText, setInputText] = useState('');
+    const [dragActive, setDragActive] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
+    const fileInputRef = useRef(null);
 
     // Parse conversation history better
     const parseHistory = (history) => {
@@ -35,7 +37,115 @@ const ModernConversationOverlay = ({ conversation, onClose }) => {
         return messages.length > 0 ? messages : [{ type: 'empty', content: 'No messages in this conversation yet.' }];
     };
 
+    if (!conversation) {
+        return null;
+    }
+
     const messages = parseHistory(conversation.history);
+
+    const validMime = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif'];
+
+    const classifyPrompt = async (prompt) => {
+        try {
+            const response = await fetch('http://localhost:3001/chat/classify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt })
+            });
+            if (!response.ok) throw new Error('Classification failed');
+            const data = await response.json();
+            return data.type;
+        } catch (err) {
+            console.error('Classification error:', err);
+            return 'text';
+        }
+    };
+
+    const handleImageGeneration = async (prompt) => {
+        const res = await fetch('http://localhost:3001/image/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt })
+        });
+        if (!res.ok) throw new Error('Image generation failed');
+        return await res.json();
+    };
+
+    const onDrop = async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragActive(false);
+        const file = e.dataTransfer?.files?.[0];
+        if (!file) return;
+        if (!validMime.includes(file.type)) return;
+        await handleImageAnalyze(file);
+    };
+
+    const handleFileSelect = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return; // cancel
+        if (!validMime.includes(file.type)) return;
+        await handleImageAnalyze(file);
+        // reset input for re-select
+        e.target.value = '';
+    };
+
+    const handleImageAnalyze = async (file) => {
+        try {
+            setIsProcessing(true);
+            handleResponse('Analyzing your image...', true);
+            const formData = new FormData();
+            formData.append('file', file);
+            if (inputText) formData.append('stuff', inputText);
+            const res = await fetch('http://localhost:3001/image/analyze', {
+                method: 'POST',
+                body: formData
+            });
+            if (!res.ok) throw new Error('Image analyze failed');
+            const data = await res.json();
+            // Persist and TTS via shared handler
+            handleResponse(data.content);
+            // Create a local blob URL for thumbnail persistence during session
+            const blobUrl = URL.createObjectURL(file);
+            addThumbnail?.(blobUrl, inputText);
+            // Insert a placeholder token into the conversation so the image is represented in history
+            // Consumers can choose to render a thumbnail for this token while state is alive
+            handleResponse('<Image>');
+        } catch (err) {
+            console.error(err);
+            handleResponse('Error analyzing image.');
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!inputText.trim()) return;
+
+        try {
+            setIsProcessing(true);
+            const mode = await classifyPrompt(inputText.trim());
+            if (mode === 'image_generation') {
+                handleResponse('Creating your image...', true);
+                const imageResponse = await handleImageGeneration(inputText.trim());
+                if (imageResponse && imageResponse.type === 'image') {
+                    // Announce and persist like main flow
+                    handleResponse(`Generated image: ${inputText.trim()}`, false, imageResponse);
+                    // Track thumbnail in-session for history overlay
+                    addThumbnail?.(imageResponse.content, inputText.trim());
+                }
+            } else {
+                await handleGreeting(inputText.trim());
+            }
+        } catch (err) {
+            console.error('Submit error:', err);
+            handleResponse('Sorry, there was an error processing your request.');
+        } finally {
+            setInputText('');
+            setIsProcessing(false);
+        }
+    };
 
     const renderTextWithLinks = (text) => {
         const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -67,14 +177,14 @@ const ModernConversationOverlay = ({ conversation, onClose }) => {
             onClick={onClose}
         >
             <motion.div
-                className="w-full max-w-4xl max-h-[90vh] overflow-hidden"
+                className="w-full max-w-4xl h-[90vh] overflow-hidden"
                 initial={{ scale: 0.9, opacity: 0, y: 20 }}
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 exit={{ scale: 0.9, opacity: 0, y: 20 }}
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
                 onClick={(e) => e.stopPropagation()}
             >
-                <GlassCard className="h-full flex flex-col">
+                <GlassCard className="h-full flex flex-col min-h-0">
                     {/* Header */}
                     <div className="flex items-center justify-between p-6 border-b border-white/10">
                         <div className="flex items-center gap-3">
@@ -92,7 +202,7 @@ const ModernConversationOverlay = ({ conversation, onClose }) => {
                     </div>
 
                     {/* Messages */}
-                    <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                    <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
                         {messages.map((message, index) => (
                             <motion.div
                                 key={index}
@@ -120,6 +230,12 @@ const ModernConversationOverlay = ({ conversation, onClose }) => {
                                             <MessageSquare className="h-8 w-8 opacity-50" />
                                             <p>{message.content}</p>
                                         </div>
+                                    ) : message.content === '<Image>' && thumbnails.length > 0 ? (
+                                        <img
+                                            src={thumbnails[thumbnails.length - 1].url}
+                                            alt={thumbnails[thumbnails.length - 1].prompt || 'Uploaded'}
+                                            className="max-w-[240px] max-h-[240px] rounded-md border border-white/10 object-cover"
+                                        />
                                     ) : (
                                         <div className="whitespace-pre-wrap break-words">
                                             {renderTextWithLinks(message.content)}
@@ -138,18 +254,63 @@ const ModernConversationOverlay = ({ conversation, onClose }) => {
                         ))}
                     </div>
 
-                    {/* Footer */}
-                    <div className="p-6 border-t border-white/10 flex justify-between items-center">
-                        <div className="text-sm text-gray-400">
-                            {messages.length > 1 ? `${messages.length} messages` : 'Empty conversation'}
-                        </div>
-                        <Button
-                            onClick={onClose}
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-6"
+                    {/* Footer: Input with image upload */}
+                    <form onSubmit={handleSubmit} className="p-6 border-t border-white/10">
+                        <div
+                            className={`flex items-center gap-3 bg-gray-800/50 rounded-xl p-2 border ${dragActive ? 'border-blue-400' : 'border-white/10'}`}
+                            onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setDragActive(true); }}
+                            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                            onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragActive(false); }}
+                            onDrop={onDrop}
                         >
-                            Close
-                        </Button>
-                    </div>
+                            <input
+                                type="text"
+                                className="flex-1 bg-transparent outline-none text-white placeholder:text-gray-400 px-3 py-2"
+                                placeholder="Type your message..."
+                                value={inputText}
+                                onChange={(e) => setInputText(e.target.value)}
+                                disabled={isProcessing}
+                            />
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+                                className="hidden"
+                                onChange={handleFileSelect}
+                            />
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="text-white hover:bg-white/10"
+                                onClick={() => fileInputRef.current?.click()}
+                                title="Upload image"
+                                aria-label="Upload image"
+                                disabled={isProcessing}
+                            >
+                                <ImagePlus className="h-5 w-5" />
+                            </Button>
+                            <Button
+                                type="submit"
+                                className="bg-blue-600 hover:bg-blue-700 text-white"
+                                disabled={isProcessing || !inputText.trim()}
+                            >
+                                <Send className="h-4 w-4 mr-1" /> Send
+                            </Button>
+                        </div>
+                        <AnimatePresence>
+                            {isProcessing && (
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    className="text-sm text-gray-400 mt-2"
+                                >
+                                    Processing...
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </form>
                 </GlassCard>
             </motion.div>
         </motion.div>
