@@ -36,13 +36,8 @@ const ModernSidePanel = ({
 
     const handleRenameConversation = (e, conversationId) => {
         e.stopPropagation();
-        const selectedConversation = conversations.find(conversation => conversation.id === conversationId);
-        if (selectedConversation) {
-            const newConversationName = prompt('Enter a new name for the conversation', selectedConversation.name);
-            if (newConversationName && newConversationName !== selectedConversation.name) {
-                onRenameConversation(conversationId, newConversationName);
-            }
-        }
+        // Defer prompting to the hook so we don't show two dialogs
+        onRenameConversation(conversationId);
     };
 
     const handleDeleteConversation = (e, conversationId) => {
