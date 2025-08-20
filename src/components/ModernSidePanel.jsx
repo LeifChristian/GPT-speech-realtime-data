@@ -111,7 +111,12 @@ const ModernSidePanel = ({
                             {/* Header */}
                             <div className="p-6 border-b border-white/10">
                                 <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
+                                    <div
+                                        className="flex items-center gap-3 cursor-pointer select-none hover:opacity-80"
+                                        onClick={() => setIsOpen(false)}
+                                        title="Close panel"
+                                        role="button"
+                                    >
                                         <MessageSquare className="h-6 w-6 text-blue-400" />
                                         <h2 className="text-xl font-bold text-white">Conversations</h2>
                                     </div>
