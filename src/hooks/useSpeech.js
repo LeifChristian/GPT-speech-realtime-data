@@ -1,6 +1,4 @@
-import { useState, useEffect } from 'react';
-
-const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+import { useState, useEffect, useRef } from 'react';
 
 export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
   const [isRecording, setIsRecording] = useState(false);
@@ -9,29 +7,42 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
   const [toggle, setToggle] = useState(false);
   const [finalTranscript, setFinalTranscript] = useState("");
   const [interimTranscript, setInterimTranscript] = useState("");
-
-  recognition.interimResults = true;
-
-  recognition.onresult = (event) => {
-    let interimTranscript = "";
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      const result = event.results[i];
-      if (result.isFinal) {
-        setFinalTranscript(result[0].transcript);
-        setEnteredText(result[0].transcript);
-        stopRecording();
-        handleGreeting(result[0].transcript);
-      } else {
-        interimTranscript += result[0].transcript;
-        setInterimTranscript(interimTranscript);
-      }
+  const recognitionRef = useRef(null);
+  // Initialize SpeechRecognition only where supported (avoids mobile Safari crashes)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      recognitionRef.current = null;
+      return;
     }
-  };
-
-  recognition.onerror = (event) => {
-    console.error("Error with speech recognition API:", event.error);
-    stopRecording();
-  };
+    if (!recognitionRef.current) {
+      const rec = new SR();
+      rec.interimResults = true;
+      rec.onresult = (event) => {
+        let interim = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const result = event.results[i];
+          if (result.isFinal) {
+            setFinalTranscript(result[0].transcript);
+            setEnteredText(result[0].transcript);
+            setIsRecording(false);
+            rec.stop();
+            handleGreeting(result[0].transcript);
+          } else {
+            interim += result[0].transcript;
+            setInterimTranscript(interim);
+          }
+        }
+      };
+      rec.onerror = (event) => {
+        console.error("Error with speech recognition API:", event.error);
+        setIsRecording(false);
+        rec.stop();
+      };
+      recognitionRef.current = rec;
+    }
+  }, [handleGreeting, setEnteredText]);
 
   const startRecording = () => {
     if (window.speechSynthesis.speaking) {
@@ -41,13 +52,19 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
       stopSpeakText();
       return;
     }
+    if (!recognitionRef.current) {
+      alert('Voice input is not supported on this device/browser.');
+      return;
+    }
     setIsRecording(true);
-    recognition.start();
+    recognitionRef.current.start();
   };
 
   const stopRecording = () => {
     setIsRecording(false);
-    recognition.stop();
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
   };
 
   const speakText = (text) => {
@@ -59,7 +76,7 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
     text = removeUrls(text);
     setShowPlayPause(true);
 
-    if ("speechSynthesis" in window) {
+    if (typeof window !== 'undefined' && "speechSynthesis" in window) {
       if (toggle) {
         setShowPlayPause(true);
         return;
@@ -122,8 +139,8 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
             .replaceAll(":", "")
         );
 
-        // Use the fifth voice in the list (adjust index as needed)
-        utterance.voice = speechSynthesis.getVoices()[5];
+        const voices = speechSynthesis.getVoices();
+        utterance.voice = voices[5] || voices[0] || null;
         utterance.onend = synthesizeSegments;
         speechSynthesis.speak(utterance);
         setIsPlaying(true);
@@ -136,6 +153,9 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
         synthesizeSegments();
       }
     } else {
+      // On unsupported browsers, ensure we don't get stuck in playing state
+      setShowPlayPause(false);
+      setIsPlaying(false);
       console.error("Speech synthesis is not supported in this browser");
     }
   };
@@ -168,8 +188,8 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
   // Clean up speech recognition on unmount
   useEffect(() => {
     return () => {
-      if (isRecording) {
-        recognition.stop();
+      if (isRecording && recognitionRef.current) {
+        recognitionRef.current.stop();
       }
       if (window.speechSynthesis.speaking) {
         window.speechSynthesis.cancel();

@@ -9,6 +9,22 @@ const {
 } = require('../middleware/uploadMiddleware');
 const axios = require('axios');
 
+// Lightweight request logging for image routes (helps debug mobile issues on DO)
+const logRequest = (req, res, next) => {
+  const start = Date.now();
+  const rid = Math.random().toString(36).slice(2, 8);
+  req._rid = rid;
+  console.log(`[IMG][${rid}] ${req.method} ${req.originalUrl} ct=${req.headers['content-type'] || ''} cl=${req.headers['content-length'] || ''}`);
+  console.log(`[IMG][${rid}] ua="${(req.headers['user-agent'] || '').slice(0, 140)}"`);
+  res.on('finish', () => {
+    const fileInfo = req.file ? `${req.file.mimetype || 'unknown'} ${req.file.size || 0}b` : 'no-file';
+    console.log(`[IMG][${rid}] status=${res.statusCode} dur=${Date.now() - start}ms file=${fileInfo}`);
+  });
+  next();
+};
+
+router.use(logRequest);
+
 // Image analysis endpoint
 router.post('/analyze',
   upload.single('file'),
@@ -22,6 +38,14 @@ router.post('/analyze',
     stuff ? console.log(stuff, '<--text prompt') : '';
 
     try {
+      if (!file || !file.buffer) {
+        console.error(`[IMG][${req._rid}] Missing file buffer; mimetype=${file && file.mimetype}`);
+        return res.status(400).json({ error: 'No file buffer', message: 'Upload failed to include file data' });
+      }
+      if (!file.mimetype) {
+        console.error(`[IMG][${req._rid}] Missing mimetype on upload`);
+        return res.status(400).json({ error: 'Unknown MIME type', message: 'File has no mimetype' });
+      }
       const base64Image = file.buffer.toString('base64');
       const model = (req.app.locals.models && req.app.locals.models.visionModel) || process.env.OPENAI_VISION_MODEL || 'gpt-4o';
       const response = await req.app.locals.openai.chat.completions.create({
@@ -41,11 +65,13 @@ router.post('/analyze',
           },
         ],
       });
-      console.log(response.choices[0].message.content, "<--- response")
+      console.log(`[IMG][${req._rid}] OpenAI vision OK len=${(response.choices[0].message.content || '').length}`)
       res.json({ type: 'text', content: response.choices[0].message.content });
     } catch (error) {
-      console.error('Error:', error.response ? error.response.data : error.message);
-      res.status(500).json({ error: 'Failed to process the file' });
+      const status = error.response?.status;
+      const data = error.response?.data;
+      console.error(`[IMG][${req._rid}] Error analyze`, { status, message: error.message, data: typeof data === 'string' ? data.slice(0, 200) : (data && JSON.stringify(data).slice(0, 200)) });
+      res.status(500).json({ error: 'Failed to process the file', status, message: error.message });
     }
   });
 
@@ -66,10 +92,13 @@ router.post('/generate', async (req, res) => {
       size: "1024x1024",
     });
     const imageUrl = response.data[0].url;
+    console.log(`[IMG][${req._rid}] Image generated url=${imageUrl ? 1 : 0}`);
     res.json({ type: 'image', content: imageUrl });
   } catch (error) {
-    console.error('Error:', error.response ? error.response.data : error.message);
-    res.status(500).json({ error: 'Failed to generate image' });
+    const status = error.response?.status;
+    const data = error.response?.data;
+    console.error(`[IMG][${req._rid}] Error generate`, { status, message: error.message, data: typeof data === 'string' ? data.slice(0, 200) : (data && JSON.stringify(data).slice(0, 200)) });
+    res.status(500).json({ error: 'Failed to generate image', status, message: error.message });
   }
 });
 

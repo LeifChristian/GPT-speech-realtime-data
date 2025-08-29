@@ -286,7 +286,9 @@ const ModernUnifiedInput = ({
                 {/* Control Buttons */}
                 <div className="flex flex-wrap gap-2 justify-center">
                     <Button
+                        type="button"
                         onClick={handleSubmit}
+                        onTouchEnd={(e) => { e.preventDefault(); if (!isProcessing && (enteredText.trim() || file)) handleSubmit(); }}
                         disabled={isProcessing || (!enteredText.trim() && !file)}
                         className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6"
                     >
