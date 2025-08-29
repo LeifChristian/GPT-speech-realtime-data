@@ -1,7 +1,22 @@
 // Centralized API base URL helper
 const apiBase = (() => {
   const envBase = process.env.REACT_APP_API_BASE_URL;
-  if (envBase) return envBase.replace(/\/$/, '');
+  if (envBase) {
+    try {
+      if (typeof window !== 'undefined') {
+        const host = window.location.hostname;
+        const isLocalHost = host === 'localhost' || host === '127.0.0.1';
+        // Ignore a localhost base when the app is not running on localhost
+        if (!isLocalHost && /^https?:\/\/localhost(?::\d+)?/i.test(envBase)) {
+          // fall through to same-origin
+        } else {
+          return envBase.replace(/\/$/, '');
+        }
+      } else {
+        return envBase.replace(/\/$/, '');
+      }
+    } catch { }
+  }
   if (typeof window !== 'undefined') {
     const fromMeta = document.querySelector('meta[name="api-base"]')?.getAttribute('content');
     if (fromMeta) return fromMeta.replace(/\/$/, '');
