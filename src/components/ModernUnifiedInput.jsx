@@ -189,7 +189,7 @@ const ModernUnifiedInput = ({
     };
 
     return (
-        <>
+        <div>
             <div className="w-full max-w-4xl mx-auto px-4">
                 {/* Hidden file inputs */}
                 <input
@@ -359,7 +359,7 @@ const ModernUnifiedInput = ({
                 </GlassCard>
             </div>
             <DebugOverlay open={debugOpen} onClose={() => setDebugOpen(false)} entries={debugEntries} />
-        </>
+        </div>
     );
 };
 
