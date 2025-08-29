@@ -67,7 +67,10 @@ const ModernUnifiedInput = ({
                 body: JSON.stringify({ prompt }),
             }, pushDebug);
 
-            if (!response.ok) throw new Error('Classification failed');
+            if (!response.ok) {
+                setDebugOpen(true);
+                throw new Error('Classification failed');
+            }
             const data = await response.json();
             return data.type;
         } catch (error) {
@@ -85,7 +88,10 @@ const ModernUnifiedInput = ({
                 body: JSON.stringify({ prompt }),
             }, pushDebug);
 
-            if (!response.ok) throw new Error('Image generation failed');
+            if (!response.ok) {
+                setDebugOpen(true);
+                throw new Error('Image generation failed');
+            }
             return await response.json();
         } catch (error) {
             console.error('Image generation error:', error);
@@ -118,6 +124,7 @@ const ModernUnifiedInput = ({
             return responseData;
         } catch (error) {
             console.error('Image analysis error:', error);
+            setDebugOpen(true);
             alert('Error analyzing image.');
         }
     };
@@ -159,13 +166,15 @@ const ModernUnifiedInput = ({
                         const data = await res.json();
                         handleResponse(data.reply);
                     } else {
-                        handleResponse('Error sending message.');
+                        setDebugOpen(true);
+                        handleResponse(`Error sending message (status ${res.status}).`);
                     }
                 }
             }
             setEnteredText('');
         } catch (error) {
             console.error('Submit error:', error);
+            setDebugOpen(true);
             handleResponse('Sorry, there was an error processing your request.');
         } finally {
             setIsProcessing(false);
