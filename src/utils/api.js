@@ -17,6 +17,37 @@ export const apiUrl = (path) => {
   return `${apiBase}/${cleanPath}`;
 };
 
+// Debug wrapper around fetch
+export async function debugFetch(label, url, options, pushDebug) {
+  const startedAt = Date.now();
+  try {
+    const res = await fetch(url, options);
+    const clone = res.clone();
+    let bodyPreview = '';
+    try { bodyPreview = await clone.text(); } catch { }
+    const text = [
+      `REQUEST ${label}`,
+      `URL: ${url}`,
+      `Method: ${(options && options.method) || 'GET'}`,
+      `Status: ${res.status}`,
+      `Duration: ${Date.now() - startedAt}ms`,
+      `Body (first 512):`,
+      bodyPreview.slice(0, 512)
+    ].join('\n');
+    pushDebug && pushDebug({ ts: startedAt, label, text });
+    return res;
+  } catch (err) {
+    const text = [
+      `REQUEST ${label} FAILED`,
+      `URL: ${url}`,
+      `Method: ${(options && options.method) || 'GET'}`,
+      `Error: ${err.message}`
+    ].join('\n');
+    pushDebug && pushDebug({ ts: startedAt, label, text });
+    throw err;
+  }
+}
+
 export default apiUrl;
 
 

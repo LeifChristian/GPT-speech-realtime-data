@@ -6,7 +6,8 @@ import PropTypes from 'prop-types';
 import { Button } from './ui/Button';
 import { TextArea } from './ui/Input';
 import { GlassCard } from './ui/Card';
-import { apiUrl } from '../utils/api';
+import { apiUrl, debugFetch } from '../utils/api';
+import DebugOverlay from './DebugOverlay';
 
 const ModernUnifiedInput = ({
     enteredText,
@@ -19,6 +20,9 @@ const ModernUnifiedInput = ({
     handleGreeting
 }) => {
     const [isProcessing, setIsProcessing] = useState(false);
+    const [debugOpen, setDebugOpen] = useState(false);
+    const [debugEntries, setDebugEntries] = useState([]);
+    const pushDebug = (e) => setDebugEntries((prev) => [...prev.slice(-49), e]);
     const [file, setFile] = useState(null);
     const [fileURL, setFileURL] = useState(null);
     const [showImagePreview, setShowImagePreview] = useState(false);
@@ -55,13 +59,13 @@ const ModernUnifiedInput = ({
     // Classify prompt using our new endpoint
     const classifyPrompt = async (prompt) => {
         try {
-            const response = await fetch(apiUrl('chat/classify'), {
+            const response = await debugFetch('classify', apiUrl('chat/classify'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({ prompt }),
-            });
+            }, pushDebug);
 
             if (!response.ok) throw new Error('Classification failed');
             const data = await response.json();
@@ -75,11 +79,11 @@ const ModernUnifiedInput = ({
     // Handle image generation
     const handleImageGeneration = async (prompt) => {
         try {
-            const response = await fetch(apiUrl('image/generate'), {
+            const response = await debugFetch('image-generate', apiUrl('image/generate'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ prompt }),
-            });
+            }, pushDebug);
 
             if (!response.ok) throw new Error('Image generation failed');
             return await response.json();
@@ -103,10 +107,10 @@ const ModernUnifiedInput = ({
         formData.append('stuff', prompt || 'What is in this image?');
 
         try {
-            const response = await fetch(apiUrl('image/analyze'), {
+            const response = await debugFetch('image-analyze', apiUrl('image/analyze'), {
                 method: 'POST',
                 body: formData,
-            });
+            }, pushDebug);
 
             if (!response.ok) throw new Error('Image analysis failed');
             const responseData = await response.json();
@@ -143,7 +147,20 @@ const ModernUnifiedInput = ({
                         handleResponse(`Generated image: ${enteredText}`, false, imageResponse);
                     }
                 } else {
-                    await handleGreeting(enteredText);
+                    const res = await debugFetch('chat-greeting', apiUrl('chat/greeting'), {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            text: `${enteredText}`,
+                            code: process.env.REACT_APP_API_KEY
+                        })
+                    }, pushDebug);
+                    if (res.ok) {
+                        const data = await res.json();
+                        handleResponse(data.reply);
+                    } else {
+                        handleResponse('Error sending message.');
+                    }
                 }
             }
             setEnteredText('');
@@ -216,6 +233,9 @@ const ModernUnifiedInput = ({
 
             {/* Main Input Area */}
             <GlassCard className="p-6 space-y-4">
+                <div className="flex justify-end">
+                    <button type="button" className="text-xs text-gray-400 underline" onClick={() => setDebugOpen(true)}>Debug</button>
+                </div>
                 {/* File Upload Controls */}
                 <div className="flex flex-wrap gap-2 justify-center">
                     <Button
@@ -328,6 +348,7 @@ const ModernUnifiedInput = ({
                 </div>
             </GlassCard>
         </div>
+        <DebugOverlay open={debugOpen} onClose={() => setDebugOpen(false)} entries={debugEntries} />
     );
 };
 
