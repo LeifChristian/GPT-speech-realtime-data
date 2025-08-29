@@ -255,18 +255,19 @@ const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, hand
                         ))}
                     </div>
 
-                    {/* Footer: Input with image upload */}
-                    <form onSubmit={handleSubmit} className="p-6 border-t border-white/10">
+                    {/* Footer: stacked input with auto-grow and send below */}
+                    <form onSubmit={handleSubmit} className="p-6 border-t border-white/10 space-y-2">
                         <div
-                            className={`flex items-center gap-3 bg-gray-800/50 rounded-xl p-2 border ${dragActive ? 'border-blue-400' : 'border-white/10'}`}
+                            className={`bg-gray-800/50 rounded-xl p-2 border ${dragActive ? 'border-blue-400' : 'border-white/10'}`}
                             onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setDragActive(true); }}
                             onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                             onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragActive(false); }}
                             onDrop={onDrop}
                         >
-                            <input
-                                type="text"
-                                className="flex-1 bg-transparent outline-none text-white placeholder:text-gray-400 px-3 py-2"
+                            <textarea
+                                rows={1}
+                                onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px'; }}
+                                className="w-full bg-transparent outline-none text-white placeholder:text-gray-400 px-3 py-2 resize-none"
                                 placeholder="Type your message..."
                                 value={inputText}
                                 onChange={(e) => setInputText(e.target.value)}
@@ -279,26 +280,28 @@ const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, hand
                                 className="hidden"
                                 onChange={handleFileSelect}
                             />
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="text-white hover:bg-white/10"
-                                onClick={() => fileInputRef.current?.click()}
-                                title="Upload image"
-                                aria-label="Upload image"
-                                disabled={isProcessing}
-                            >
-                                <ImagePlus className="h-5 w-5" />
-                            </Button>
-                            <Button
-                                type="submit"
-                                className="bg-blue-600 hover:bg-blue-700 text-white"
-                                disabled={isProcessing || !inputText.trim()}
-                            >
-                                <Send className="h-4 w-4 mr-1" /> Send
-                            </Button>
+                            <div className="flex justify-end pt-2">
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-white hover:bg-white/10"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    title="Upload image"
+                                    aria-label="Upload image"
+                                    disabled={isProcessing}
+                                >
+                                    <ImagePlus className="h-5 w-5" />
+                                </Button>
+                            </div>
                         </div>
+                        <Button
+                            type="submit"
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                            disabled={isProcessing || !inputText.trim()}
+                        >
+                            <Send className="h-4 w-4 mr-1" /> Send
+                        </Button>
                         <AnimatePresence>
                             {isProcessing && (
                                 <motion.div

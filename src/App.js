@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageSquare } from "lucide-react";
 import "./App.css";
@@ -26,6 +26,7 @@ function App() {
   const [sessionImages, setSessionImages] = useState([]);
   const [conversationThumbnails, setConversationThumbnails] = useState({});
   const [currentConversationName, setCurrentConversationName] = useState('');
+  const responseRef = useRef(null);
 
   // Speech controls are initialized after we get handleGreeting from conversations
 
@@ -59,6 +60,15 @@ function App() {
     const responseText = imageData ? `Generated image: ${enteredText}` : response1;
     // Persist response to the selected conversation
     appendResponseToHistory(responseText);
+    // Auto-scroll to response on mobile
+    setTimeout(() => {
+      try {
+        if (responseRef.current) {
+          responseRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          window.scrollBy({ top: -80, behavior: 'smooth' });
+        }
+      } catch { }
+    }, 50);
   };
 
   const addConversationThumbnail = (conversationId, url, prompt) => {
@@ -316,6 +326,7 @@ function App() {
               exit={{ opacity: 0, y: -20, scale: 0.95 }}
               transition={{ duration: 0.4 }}
               className="w-full max-w-4xl"
+              ref={responseRef}
             >
               <div className="glass-dark p-6 rounded-xl text-gray-100 text-lg leading-relaxed max-h-96 overflow-y-auto">
                 <div className="whitespace-pre-wrap font-medium">
