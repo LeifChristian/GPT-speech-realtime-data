@@ -21,8 +21,7 @@ const apiBase = (() => {
     const fromMeta = document.querySelector('meta[name="api-base"]')?.getAttribute('content');
     if (fromMeta) return fromMeta.replace(/\/$/, '');
   }
-  // Fallbacks: development proxy or same-origin
-  if (process.env.NODE_ENV === 'development') return 'http://localhost:3001';
+  // Fallback: same-origin. In development, CRA's proxy will handle /chat, /image, etc.
   return '';
 })();
 
