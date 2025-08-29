@@ -1,3 +1,4 @@
+import { apiUrl } from '../utils/api';
 import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, MessageSquare, User, Bot, ImagePlus, Send } from 'lucide-react';
@@ -47,7 +48,7 @@ const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, hand
 
     const classifyPrompt = async (prompt) => {
         try {
-            const response = await fetch('http://localhost:3001/chat/classify', {
+            const response = await fetch(apiUrl('chat/classify'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ prompt })
@@ -62,7 +63,7 @@ const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, hand
     };
 
     const handleImageGeneration = async (prompt) => {
-        const res = await fetch('http://localhost:3001/image/generate', {
+        const res = await fetch(apiUrl('image/generate'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ prompt })
@@ -97,7 +98,7 @@ const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, hand
             const formData = new FormData();
             formData.append('file', file);
             if (inputText) formData.append('stuff', inputText);
-            const res = await fetch('http://localhost:3001/image/analyze', {
+            const res = await fetch(apiUrl('image/analyze'), {
                 method: 'POST',
                 body: formData
             });

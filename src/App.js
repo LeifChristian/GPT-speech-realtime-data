@@ -11,6 +11,7 @@ import { useConversations } from "./hooks/useConversations";
 import { useSpeech } from "./hooks/useSpeech";
 import { usePasswordProtection } from "./hooks/usePasswordProtection";
 import { Button } from "./components/ui/Button";
+import { apiUrl } from "./utils/api";
 
 const API_KEY = process.env.REACT_APP_API_KEY;
 
@@ -71,7 +72,7 @@ function App() {
 
   const downloadCurrentImage = async (url) => {
     try {
-      const response = await fetch(`http://localhost:3001/image/download?url=${encodeURIComponent(url)}`);
+      const response = await fetch(apiUrl(`image/download?url=${encodeURIComponent(url)}`));
       if (!response.ok) throw new Error('Proxy download failed');
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);

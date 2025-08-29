@@ -54,6 +54,15 @@ app.use('/image', imageRouter);
 app.use('/chat', chatRouter);
 app.use('/file', fileRouter);
 
+// Serve frontend build in production and support SPA routing
+if (process.env.NODE_ENV === 'production') {
+  const clientBuildPath = path.join(__dirname, '..', 'build');
+  app.use(express.static(clientBuildPath));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(clientBuildPath, 'index.html'));
+  });
+}
+
 // Create savedConvos directory if it doesn't exist
 const savedConvosPath = path.join(process.cwd(), 'savedConvos');
 if (!fs.existsSync(savedConvosPath)) {

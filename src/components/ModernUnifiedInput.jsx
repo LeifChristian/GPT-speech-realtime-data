@@ -6,6 +6,7 @@ import PropTypes from 'prop-types';
 import { Button } from './ui/Button';
 import { TextArea } from './ui/Input';
 import { GlassCard } from './ui/Card';
+import { apiUrl } from '../utils/api';
 
 const ModernUnifiedInput = ({
     enteredText,
@@ -54,7 +55,7 @@ const ModernUnifiedInput = ({
     // Classify prompt using our new endpoint
     const classifyPrompt = async (prompt) => {
         try {
-            const response = await fetch('http://localhost:3001/chat/classify', {
+            const response = await fetch(apiUrl('chat/classify'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -74,7 +75,7 @@ const ModernUnifiedInput = ({
     // Handle image generation
     const handleImageGeneration = async (prompt) => {
         try {
-            const response = await fetch('http://localhost:3001/image/generate', {
+            const response = await fetch(apiUrl('image/generate'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ prompt }),
@@ -102,7 +103,7 @@ const ModernUnifiedInput = ({
         formData.append('stuff', prompt || 'What is in this image?');
 
         try {
-            const response = await fetch('http://localhost:3001/image/analyze', {
+            const response = await fetch(apiUrl('image/analyze'), {
                 method: 'POST',
                 body: formData,
             });

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiUrl } from '../utils/api';
 
 export const useConversations = (apiKey, setRez, handleResponse) => {
   const [conversations, setConversations] = useState([]);
@@ -121,7 +122,7 @@ export const useConversations = (apiKey, setRez, handleResponse) => {
         code: apiKey,
       };
 
-      const response = await fetch("http://localhost:3001/chat/greeting", {
+      const response = await fetch(apiUrl('chat/greeting'), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
