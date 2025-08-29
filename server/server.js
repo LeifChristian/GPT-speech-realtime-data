@@ -3,7 +3,7 @@ const fs = require('fs');
 require('dotenv').config();
 const cors = require('cors');
 const multer = require('multer');
-const OpenAI = require('openai');
+const { OpenAI } = require('openai');
 const bodyParser = require('body-parser');
 const path = require('path');
 
