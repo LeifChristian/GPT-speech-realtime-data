@@ -291,6 +291,20 @@ const axios = require('axios');
 const OpenAI = require('openai');
 const { checkAuth, checkChatAuth } = require('../middleware/authMiddleware');
 
+// Minimal request logging to debug mobile submissions in production
+const logRequest = (req, res, next) => {
+  const start = Date.now();
+  const rid = Math.random().toString(36).slice(2, 8);
+  req._rid = rid;
+  console.log(`[CHAT][${rid}] ${req.method} ${req.originalUrl} ct=${req.headers['content-type'] || ''}`);
+  res.on('finish', () => {
+    console.log(`[CHAT][${rid}] status=${res.statusCode} dur=${Date.now() - start}ms`);
+  });
+  next();
+};
+
+router.use(logRequest);
+
 // API Function Definitions
 async function get_population(city) {
   const minPopulation = 1;
@@ -508,7 +522,7 @@ router.post('/greeting', async (req, res) => {
   const { textModel } = req.app.locals.models || { textModel: process.env.OPENAI_MODEL || 'gpt-4o-mini' };
 
   try {
-    console.log('[CHAT] /greeting request', { textPreview: typeof text === 'string' ? text.slice(0, 200) : typeof text });
+    console.log(`[CHAT][${req._rid}] /greeting textPreview=${typeof text === 'string' ? text.slice(0, 120) : typeof text}`);
     const messages = [{ role: 'user', content: text }];
 
     // New SDK call
@@ -549,13 +563,16 @@ router.post('/greeting', async (req, res) => {
       });
 
       const reply = followup.choices[0].message.content;
+      console.log(`[CHAT][${req._rid}] /greeting followup OK len=${(reply || '').length}`);
       res.json({ reply });
     } else {
       const reply = response.choices[0].message.content;
+      console.log(`[CHAT][${req._rid}] /greeting initial OK len=${(reply || '').length}`);
       res.json({ reply });
     }
   } catch (error) {
-    console.error('[CHAT] /greeting error', { message: error.message, data: error.response?.data, stack: error.stack });
+    const status = error.response?.status;
+    console.error(`[CHAT][${req._rid}] /greeting error`, { status, message: error.message });
     res.status(500).json({ error: 'Error processing text' });
   }
 });
@@ -601,6 +618,7 @@ router.post('/classify', async (req, res) => {
     });
 
     const classification = response.choices[0].message.content.trim().toLowerCase();
+    console.log(`[CHAT][${req._rid}] /classify -> ${classification}`);
 
     // Validate the response
     if (classification === 'image_generation' || classification === 'text') {
@@ -610,7 +628,7 @@ router.post('/classify', async (req, res) => {
       res.json({ type: 'text' });
     }
   } catch (error) {
-    console.error('Classification error:', error.message);
+    console.error(`[CHAT][${req._rid}] /classify error:`, error.message);
     // Default to text on error
     res.json({ type: 'text' });
   }
