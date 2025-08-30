@@ -317,23 +317,31 @@ async function get_population(city) {
   return JSON.stringify(populationData);
 }
 
-async function get_current_weather(location, unit = 'imperial') {
-  const apiKey = process.env.weatherAPIKey;
+async function get_current_weather({ location, unit = 'fahrenheit' }) {
   try {
-    const response = await axios.get(`http://api.weatherstack.com/current`, {
-      params: {
-        access_key: apiKey,
-        query: location,
-        units: unit === 'imperial' ? 'f' : 'm',
-      },
-    });
-    const weatherData = response.data;
-    const temperature = weatherData.current.temperature;
-    const locationName = weatherData.location.name;
-    return `Current temperature in ${locationName} is ${temperature} ${unit === 'imperial' ? 'F' : 'C'}`;
+    console.log(`[WEATHER] Fetching for location: ${location}, unit: ${unit}`);
+    const weatherResponse = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${location}&units=imperial&appid=${process.env.weatherAPIKey}`);
+    const weatherData = await weatherResponse.json();
+    console.log(`[WEATHER] Response: ${JSON.stringify(weatherData)}`);
+
+    if (!weatherData || !weatherData.main || typeof weatherData.main.temp === 'undefined') {
+      console.error(`[WEATHER] Invalid data: ${JSON.stringify(weatherData)}`);
+      return { status: 'error', message: 'Weather data unavailable' };
+    }
+
+    const temperature = Math.round(weatherData.main.temp);
+    const description = weatherData.weather[0].description;
+    const city = weatherData.name;
+
+    return {
+      location: city,
+      temperature: temperature,
+      unit: unit === 'fahrenheit' ? 'F' : 'C',
+      forecast: description
+    };
   } catch (error) {
-    console.error('Error getting weather:', error);
-    throw new Error('Failed to get the current weather');
+    console.error(`[WEATHER] Error: ${error.message}`);
+    return { status: 'error', message: 'Failed to fetch weather' };
   }
 }
 
@@ -540,7 +548,8 @@ router.post('/greeting', async (req, res) => {
 
       let function_response;
       if (function_name === 'get_current_weather') {
-        function_response = await get_current_weather(function_args.location, function_args.unit);
+        function_response = await get_current_weather(function_args);
+        console.log(`[CHAT] Function response: ${JSON.stringify(function_response)}`);
       } else if (function_name === 'get_news') {
         function_response = await get_news(function_args.query);
       } else if (function_name === 'get_population') {

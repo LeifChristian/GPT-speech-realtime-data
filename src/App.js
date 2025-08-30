@@ -308,6 +308,7 @@ function App() {
             rez={rez}
             handleGreeting={handleGreeting}
             appendQuestionToHistory={appendQuestionToHistory}
+            appendResponseToHistory={appendResponseToHistory}
           />
         </motion.div>
 
