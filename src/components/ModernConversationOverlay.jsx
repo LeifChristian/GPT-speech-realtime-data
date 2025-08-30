@@ -1,5 +1,5 @@
 import { apiUrl } from '../utils/api';
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, MessageSquare, User, Bot, ImagePlus, Send, Square, Play, Pause } from 'lucide-react';
 import { Button } from './ui/Button';
@@ -12,6 +12,32 @@ const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, hand
     const [isProcessing, setIsProcessing] = useState(false);
     const [isSpeaking, setIsSpeaking] = useState(false);
     const fileInputRef = useRef(null);
+
+    // Add state after existing states
+    const [file, setFile] = useState(null);
+    const [fileURL, setFileURL] = useState(null);
+    const [showImagePreview, setShowImagePreview] = useState(false);
+
+    // Re-add state for local messages
+    const [messages, setMessages] = useState([]);
+
+    // Re-add useEffect to parse history
+    useEffect(() => {
+        if (conversation?.history) {
+            const parts = conversation.history.split(/(Question: |Response: )/);
+            const historyMessages = [];
+            for (let i = 1; i < parts.length; i += 2) { // Start from 1 to skip empty first part
+                const type = parts[i].includes('Question:') ? 'user' : 'assistant';
+                const content = parts[i + 1].trim();
+                if (content) {
+                    historyMessages.push({ id: Date.now() + i, role: type, content });
+                }
+            }
+            setMessages(historyMessages);
+        } else {
+            setMessages([]);
+        }
+    }, [conversation]);
 
     // Parse conversation history better
     const parseHistory = (history) => {
@@ -42,8 +68,6 @@ const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, hand
     if (!conversation) {
         return null;
     }
-
-    const messages = parseHistory(conversation.history);
 
     const validMime = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif'];
 
@@ -83,13 +107,22 @@ const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, hand
         await handleImageAnalyze(file);
     };
 
-    const handleFileSelect = async (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return; // cancel
-        if (!validMime.includes(file.type)) return;
-        await handleImageAnalyze(file);
-        // reset input for re-select
-        e.target.value = '';
+    // Add handleFileSelect function
+    const handleFileSelect = (e) => {
+        const selectedFile = e.target.files[0];
+        if (selectedFile) {
+            setFile(selectedFile);
+            setFileURL(URL.createObjectURL(selectedFile));
+            setShowImagePreview(true);
+        }
+    };
+
+    // Add clearFile function
+    const clearFile = () => {
+        setFile(null);
+        setFileURL(null);
+        setShowImagePreview(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
     const handleImageAnalyze = async (file) => {
@@ -121,26 +154,81 @@ const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, hand
         }
     };
 
+    // Update handleImageAnalysis to use local handleResponse and append to history
+    const handleImageAnalysis = async (prompt) => {
+        if (!file) return;
+
+        // Use local temp message
+        const tempId = Date.now();
+        setMessages(prev => [...prev, { id: tempId, role: 'assistant', content: 'Analyzing your image...', isTemp: true }]);
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('stuff', prompt || 'What is in this image?');
+
+        try {
+            const response = await fetch(apiUrl('image/analyze'), {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) throw new Error('Image analysis failed');
+            const responseData = await response.json();
+
+            // Remove temp message
+            setMessages(prev => prev.filter(msg => msg.id !== tempId));
+
+            // Add to local messages (like handleGreeting)
+            setMessages(prev => [...prev, { id: Date.now(), role: 'assistant', content: responseData.content }]);
+
+            // Persist to global history
+            appendQuestionToHistory(prompt ? `Question about image: ${prompt}` : 'Analyze image');
+            // appendResponseToHistory(responseData.content); // This line was removed from the new_code, so it's removed here.
+
+            // Speak if needed
+            speakText(responseData.content);
+
+            return responseData;
+        } catch (error) {
+            console.error('Image analysis error:', error);
+            setMessages(prev => prev.filter(msg => msg.id !== tempId));
+            setMessages(prev => [...prev, { id: Date.now(), role: 'assistant', content: 'Error analyzing image.' }]);
+        } finally {
+            clearFile();
+            setIsProcessing(false); // Ensure processing ends
+        }
+    };
+
+    // Update handleSubmit to handle file
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!inputText.trim()) return;
+        if (!inputText.trim() && !file) return;
 
         try {
             setIsProcessing(true);
-            const mode = await classifyPrompt(inputText.trim());
-            if (mode === 'image_generation') {
-                handleResponse('Creating your image...', true);
-                await appendQuestionToHistory(inputText.trim());
-                const imageResponse = await handleImageGeneration(inputText.trim());
-                if (imageResponse && imageResponse.type === 'image') {
-                    // Announce and persist like main flow
-                    handleResponse(`Generated image: ${inputText.trim()}`, false, imageResponse);
-                    // Track thumbnail in-session for history overlay
-                    addThumbnail?.(imageResponse.content, inputText.trim());
+
+            if (file) {
+                if (inputText.trim() && !conversation.history.endsWith(`Question: ${inputText.trim()}`)) {
+                    await appendQuestionToHistory(inputText.trim());
+                } else if (!inputText.trim()) {
+                    await appendQuestionToHistory('Analyze image');
                 }
+                await handleImageAnalysis(inputText.trim());
             } else {
-                await appendQuestionToHistory(inputText.trim());
-                await handleGreeting(inputText.trim());
+                if (inputText.trim() && !conversation.history.endsWith(`Question: ${inputText.trim()}`)) {
+                    await appendQuestionToHistory(inputText.trim());
+                }
+                const mode = await classifyPrompt(inputText.trim());
+                if (mode === 'image_generation') {
+                    handleResponse('Creating your image...', true);
+                    const imageResponse = await handleImageGeneration(inputText.trim());
+                    if (imageResponse && imageResponse.type === 'image') {
+                        handleResponse(`Generated image: ${inputText.trim()}`, false, imageResponse);
+                        addThumbnail?.(imageResponse.content, inputText.trim());
+                    }
+                } else {
+                    await handleGreeting(inputText.trim());
+                }
             }
         } catch (err) {
             console.error('Submit error:', err);
@@ -213,9 +301,9 @@ const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, hand
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: index * 0.1 }}
-                                className={`flex gap-4 ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+                                className={`flex gap-4 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                             >
-                                {message.type === 'bot' && (
+                                {message.role === 'assistant' && (
                                     <div className="flex-shrink-0">
                                         <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center">
                                             <Bot className="h-4 w-4 text-white" />
@@ -223,13 +311,10 @@ const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, hand
                                     </div>
                                 )}
 
-                                <div className={`max-w-[70%] rounded-2xl p-4 ${message.type === 'empty'
-                                    ? 'bg-gray-700/50 text-gray-300 text-center'
-                                    : message.type === 'user'
-                                        ? 'bg-blue-600 text-white'
-                                        : 'bg-gray-700/50 text-gray-100'
+                                <div className={`max-w-[70%] rounded-2xl p-4 ${message.role === 'empty' ? 'bg-gray-700/50 text-gray-300 text-center' :
+                                    message.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-700/50 text-gray-100'
                                     }`}>
-                                    {message.type === 'empty' ? (
+                                    {message.role === 'empty' ? (
                                         <div className="flex flex-col items-center gap-2">
                                             <MessageSquare className="h-8 w-8 opacity-50" />
                                             <p>{message.content}</p>
@@ -247,7 +332,7 @@ const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, hand
                                     )}
                                 </div>
 
-                                {message.type === 'user' && (
+                                {message.role === 'user' && (
                                     <div className="flex-shrink-0">
                                         <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center">
                                             <User className="h-4 w-4 text-white" />
@@ -269,7 +354,16 @@ const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, hand
                             }} title="Play/Pause" aria-label="Play/Pause">
                                 {isSpeaking ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
                             </Button>
-                            <Button type="button" variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={() => fileInputRef.current?.click()} title="Upload image" aria-label="Upload image">
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="text-white hover:bg-white/10"
+                                onClick={() => fileInputRef.current?.click()}
+                                title="Upload image"
+                                aria-label="Upload image"
+                                disabled={isProcessing}
+                            >
                                 <ImagePlus className="h-5 w-5" />
                             </Button>
                         </div>
@@ -280,6 +374,26 @@ const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, hand
                             onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragActive(false); }}
                             onDrop={onDrop}
                         >
+                            {showImagePreview && fileURL && (
+                                <div className="relative mb-4">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={clearFile}
+                                        className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white"
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </Button>
+                                    <img
+                                        src={fileURL}
+                                        alt="Selected for analysis"
+                                        className="w-full max-h-48 object-cover rounded-md"
+                                    />
+                                    <p className="text-sm text-gray-300 mt-2 text-center">
+                                        Image ready for analysis
+                                    </p>
+                                </div>
+                            )}
                             <textarea
                                 rows={1}
                                 onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px'; }}
