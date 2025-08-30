@@ -100,6 +100,8 @@ function App() {
 
   const {
     conversations,
+    selectedConversationId: hookSelectedConversationId,
+    thisConversation,
     handleAddConversation,
     handleRenameConversation,
     handleDeleteConversation,
@@ -143,6 +145,18 @@ function App() {
     const selected = conversations.find(c => c.id === selectedConversationId);
     setCurrentConversationName(selected?.name || '');
   }, [conversations, selectedConversationId]);
+
+  // Auto-sync when the hook creates/selects a conversation (e.g., first prompt)
+  useEffect(() => {
+    if (hookSelectedConversationId && hookSelectedConversationId !== selectedConversationId) {
+      setSelectedConversationId(hookSelectedConversationId);
+      if (thisConversation) {
+        setThisConversation(thisConversation);
+        setCurrentConversationName(thisConversation.name || '');
+      }
+      setIsOverlayVisible(true);
+    }
+  }, [hookSelectedConversationId, thisConversation, selectedConversationId, setThisConversation]);
 
   usePasswordProtection();
 
@@ -201,6 +215,7 @@ function App() {
             onClose={handleOverlayClose}
             handleGreeting={handleGreeting}
             handleResponse={handleResponse}
+            appendQuestionToHistory={appendQuestionToHistory}
             thumbnails={conversationThumbnails[selectedConversationId] || []}
             addThumbnail={(url, prompt) => addConversationThumbnail(selectedConversationId, url, prompt)}
             speakText={speakText}
@@ -279,6 +294,7 @@ function App() {
             downloadConvo={downloadConvo}
             rez={rez}
             handleGreeting={handleGreeting}
+            appendQuestionToHistory={appendQuestionToHistory}
           />
         </motion.div>
 

@@ -17,7 +17,8 @@ const ModernUnifiedInput = ({
     clearConversationHistory,
     downloadConvo,
     rez,
-    handleGreeting
+    handleGreeting,
+    appendQuestionToHistory
 }) => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [debugOpen, setDebugOpen] = useState(false);
@@ -141,9 +142,9 @@ const ModernUnifiedInput = ({
 
         try {
             if (file) {
-                // Add the user's question about the image to history
+                // Add the user's question about the image to history immediately
                 if (enteredText && enteredText.trim()) {
-                    await handleGreeting(enteredText);
+                    await appendQuestionToHistory(enteredText.trim());
                 }
                 await handleImageAnalysis(enteredText);
                 clearFile();
@@ -152,6 +153,7 @@ const ModernUnifiedInput = ({
 
                 if (classificationType === 'image_generation') {
                     handleResponse('Creating your image...', true);
+                    await appendQuestionToHistory(enteredText.trim());
                     const imageResponse = await handleImageGeneration(enteredText);
 
                     if (imageResponse && imageResponse.type === 'image') {

@@ -5,7 +5,7 @@ import { X, MessageSquare, User, Bot, ImagePlus, Send, Square, Play, Pause } fro
 import { Button } from './ui/Button';
 import { GlassCard } from './ui/Card';
 
-const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, handleResponse, thumbnails = [], addThumbnail, speakText }) => {
+const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, handleResponse, appendQuestionToHistory, thumbnails = [], addThumbnail, speakText }) => {
     // Local input state (must be declared before any conditional returns)
     const [inputText, setInputText] = useState('');
     const [dragActive, setDragActive] = useState(false);
@@ -130,6 +130,7 @@ const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, hand
             const mode = await classifyPrompt(inputText.trim());
             if (mode === 'image_generation') {
                 handleResponse('Creating your image...', true);
+                await appendQuestionToHistory(inputText.trim());
                 const imageResponse = await handleImageGeneration(inputText.trim());
                 if (imageResponse && imageResponse.type === 'image') {
                     // Announce and persist like main flow
@@ -138,6 +139,7 @@ const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, hand
                     addThumbnail?.(imageResponse.content, inputText.trim());
                 }
             } else {
+                await appendQuestionToHistory(inputText.trim());
                 await handleGreeting(inputText.trim());
             }
         } catch (err) {
