@@ -111,7 +111,8 @@ function App() {
     setThisConversation,
     handleSelectConversation: selectConversation,
     appendResponseToHistory,
-    appendQuestionToHistory
+    appendQuestionToHistory,
+    debugLog
   } = useConversations(API_KEY, setRez, handleResponse);
 
   // Now that handleGreeting is defined, wire up speech controls with correct args
@@ -243,6 +244,13 @@ function App() {
         {currentConversationName && (
           <div className="absolute top-16 left-1/2 -translate-x-1/2 text-white font-bold text-lg text-center max-w-xs break-words">
             {currentConversationName}
+          </div>
+        )}
+
+        {/* Debug log for conversation creation */}
+        {debugLog.length > 0 && (
+          <div className="absolute top-32 left-4 bg-black/80 text-white text-xs p-2 rounded max-w-sm max-h-32 overflow-y-auto">
+            {debugLog.map((log, i) => <div key={i}>{log}</div>)}
           </div>
         )}
         {/* Modern Header */}

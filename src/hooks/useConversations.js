@@ -5,6 +5,13 @@ export const useConversations = (apiKey, setRez, handleResponse) => {
   const [conversations, setConversations] = useState([]);
   const [selectedConversationId, setSelectedConversationId] = useState(null);
   const [thisConversation, setThisConversation] = useState(null);
+  const [debugLog, setDebugLog] = useState([]);
+
+  const addDebugLog = (msg) => {
+    const entry = `${new Date().toLocaleTimeString()}: ${msg}`;
+    setDebugLog(prev => [...prev.slice(-19), entry]);
+    console.log('🔥', entry);
+  };
 
   useEffect(() => {
     const storedConversations = JSON.parse(localStorage.getItem('conversations') || '[]');
@@ -68,6 +75,7 @@ export const useConversations = (apiKey, setRez, handleResponse) => {
   // ... other code remains the same ...
 
   const handleGreeting = async (theStuff) => {
+    addDebugLog(`handleGreeting called with: ${theStuff}, selectedId: ${selectedConversationId}`);
     try {
       let currentConversation;
 
@@ -77,7 +85,9 @@ export const useConversations = (apiKey, setRez, handleResponse) => {
         const date = now.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
         const time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
         const autoName = `Convo ${date} ${time}`;
+        addDebugLog(`Auto-creating conversation: ${autoName}`);
         currentConversation = handleAddConversation(autoName);
+        addDebugLog(`Created conversation: ${currentConversation?.id || 'FAILED'}`);
       } else {
         currentConversation = conversations.find(
           conv => conv.id === selectedConversationId
@@ -291,6 +301,7 @@ export const useConversations = (apiKey, setRez, handleResponse) => {
     downloadConvo,
     setThisConversation,
     appendResponseToHistory,
-    appendQuestionToHistory
+    appendQuestionToHistory,
+    debugLog
   };
 };
