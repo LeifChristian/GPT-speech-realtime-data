@@ -150,16 +150,15 @@ function App() {
   useEffect(() => {
     if (hookSelectedConversationId) {
       setSelectedConversationId(hookSelectedConversationId);
-      if (thisConversation) {
+      // Force refresh conversations from localStorage to catch new ones
+      const stored = JSON.parse(localStorage.getItem('conversations') || '[]');
+      const found = stored.find(c => c.id === hookSelectedConversationId);
+      if (found) {
+        setThisConversation(found);
+        setCurrentConversationName(found.name || 'Untitled');
+      } else if (thisConversation) {
         setThisConversation(thisConversation);
-        let conversationName = thisConversation.name;
-        if (!conversationName) {
-          const now = new Date();
-          const date = now.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
-          const time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-          conversationName = `Convo ${date} ${time}`;
-        }
-        setCurrentConversationName(conversationName);
+        setCurrentConversationName(thisConversation.name || 'Untitled');
       }
     }
   }, [hookSelectedConversationId, thisConversation, setThisConversation]);
@@ -242,7 +241,7 @@ function App() {
       <main className="min-h-screen flex flex-col items-center justify-center p-4 relative z-10">
         {/* Current conversation name */}
         {currentConversationName && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 text-white font-bold text-lg">
+          <div className="absolute top-16 left-1/2 -translate-x-1/2 text-white font-bold text-lg text-center max-w-xs break-words">
             {currentConversationName}
           </div>
         )}

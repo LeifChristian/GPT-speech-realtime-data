@@ -72,19 +72,23 @@ export const useConversations = (apiKey, setRez, handleResponse) => {
       let currentConversation;
 
       if (!selectedConversationId) {
-        currentConversation = await createAndSelectConversation();
-        const storedConversations = JSON.parse(localStorage.getItem('conversations') || '[]');
-        if (!storedConversations.some(conv => conv.id === currentConversation.id)) {
-          storedConversations.push(currentConversation);
-          localStorage.setItem('conversations', JSON.stringify(storedConversations));
-        }
+        // Auto-create with timestamp name (same as manual creation)
+        const now = new Date();
+        const date = now.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
+        const time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        const autoName = `Convo ${date} ${time}`;
+        currentConversation = handleAddConversation(autoName);
       } else {
         currentConversation = conversations.find(
           conv => conv.id === selectedConversationId
         );
 
         if (!currentConversation) {
-          currentConversation = await createAndSelectConversation();
+          const now = new Date();
+          const date = now.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
+          const time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+          const autoName = `Convo ${date} ${time}`;
+          currentConversation = handleAddConversation(autoName);
         }
       }
 
