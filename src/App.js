@@ -230,6 +230,8 @@ function App() {
             thumbnails={conversationThumbnails[selectedConversationId] || []}
             addThumbnail={(url, prompt) => addConversationThumbnail(selectedConversationId, url, prompt)}
             speakText={speakText}
+            updateMainResponse={(content) => setRez(content)}
+            appendResponseToHistory={appendResponseToHistory}
           />
         )}
       </AnimatePresence>

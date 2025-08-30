@@ -5,7 +5,7 @@ import { X, MessageSquare, User, Bot, ImagePlus, Send, Square, Play, Pause } fro
 import { Button } from './ui/Button';
 import { GlassCard } from './ui/Card';
 
-const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, handleResponse, appendQuestionToHistory, thumbnails = [], addThumbnail, speakText }) => {
+const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, handleResponse, appendQuestionToHistory, appendResponseToHistory, thumbnails = [], addThumbnail, speakText, updateMainResponse }) => {
     // Local input state (must be declared before any conditional returns)
     const [inputText, setInputText] = useState('');
     const [dragActive, setDragActive] = useState(false);
@@ -20,6 +20,10 @@ const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, hand
 
     // Re-add state for local messages
     const [messages, setMessages] = useState([]);
+
+    // Add state for analyzed images
+    const [analyzedImages, setAnalyzedImages] = useState([]);
+    const [fullImage, setFullImage] = useState(null);
 
     // Re-add useEffect to parse history
     useEffect(() => {
@@ -154,13 +158,21 @@ const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, hand
         }
     };
 
+    // Add local response handler
+    const localHandleResponse = (content, isTemp = false) => {
+        const msgId = Date.now();
+        setMessages(prev => [...prev, { id: msgId, role: isTemp ? 'temp' : 'assistant', content, isTemp }]);
+        if (!isTemp) {
+            speakText(content);
+        }
+    };
+
     // Update handleImageAnalysis to use local handleResponse and append to history
     const handleImageAnalysis = async (prompt) => {
         if (!file) return;
 
         // Use local temp message
-        const tempId = Date.now();
-        setMessages(prev => [...prev, { id: tempId, role: 'assistant', content: 'Analyzing your image...', isTemp: true }]);
+        localHandleResponse('Analyzing your image...', true);
 
         const formData = new FormData();
         formData.append('file', file);
@@ -176,23 +188,29 @@ const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, hand
             const responseData = await response.json();
 
             // Remove temp message
-            setMessages(prev => prev.filter(msg => msg.id !== tempId));
+            setMessages(prev => prev.filter(msg => !msg.isTemp));
 
             // Add to local messages (like handleGreeting)
-            setMessages(prev => [...prev, { id: Date.now(), role: 'assistant', content: responseData.content }]);
+            localHandleResponse(responseData.content);
 
             // Persist to global history
             appendQuestionToHistory(prompt ? `Question about image: ${prompt}` : 'Analyze image');
-            // appendResponseToHistory(responseData.content); // This line was removed from the new_code, so it's removed here.
+            appendResponseToHistory(responseData.content);
 
             // Speak if needed
-            speakText(responseData.content);
+            if (speakText) speakText(responseData.content); // Assuming it's optional or check if not already speaking
+
+            // Add to analyzed images
+            const msgId = Date.now(); // Generate a unique ID for the response
+            setMessages(prev => [...prev, { id: msgId, role: 'assistant', content: responseData.content }]);
+            setAnalyzedImages(prev => [...prev, { id: msgId, url: fileURL, prompt }]); // Use the message id
+            updateMainResponse(responseData.content);
 
             return responseData;
         } catch (error) {
             console.error('Image analysis error:', error);
-            setMessages(prev => prev.filter(msg => msg.id !== tempId));
-            setMessages(prev => [...prev, { id: Date.now(), role: 'assistant', content: 'Error analyzing image.' }]);
+            setMessages(prev => prev.filter(msg => !msg.isTemp));
+            localHandleResponse('Error analyzing image.');
         } finally {
             clearFile();
             setIsProcessing(false); // Ensure processing ends
@@ -202,18 +220,17 @@ const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, hand
     // Update handleSubmit to handle file
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!inputText.trim() && !file) return;
+        if ((!inputText.trim() && !file)) return; // Allow if file only
 
         try {
             setIsProcessing(true);
 
             if (file) {
-                if (inputText.trim() && !conversation.history.endsWith(`Question: ${inputText.trim()}`)) {
-                    await appendQuestionToHistory(inputText.trim());
-                } else if (!inputText.trim()) {
-                    await appendQuestionToHistory('Analyze image');
+                const analysisPrompt = inputText.trim() || 'Describe this image';
+                if (!conversation.history.endsWith(`Question: ${analysisPrompt}`)) {
+                    await appendQuestionToHistory(analysisPrompt);
                 }
-                await handleImageAnalysis(inputText.trim());
+                await handleImageAnalysis(analysisPrompt);
             } else {
                 if (inputText.trim() && !conversation.history.endsWith(`Question: ${inputText.trim()}`)) {
                     await appendQuestionToHistory(inputText.trim());
@@ -332,6 +349,17 @@ const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, hand
                                     )}
                                 </div>
 
+                                {message.role === 'assistant' && analyzedImages.some(img => img.id === message.id) && (
+                                    <div className="mt-2">
+                                        <img
+                                            src={analyzedImages.find(img => img.id === message.id).url}
+                                            alt="Analyzed image"
+                                            className="max-w-[240px] max-h-[240px] rounded-md border border-white/10 object-cover cursor-pointer"
+                                            onClick={() => setFullImage(analyzedImages.find(img => img.id === message.id).url)}
+                                        />
+                                    </div>
+                                )}
+
                                 {message.role === 'user' && (
                                     <div className="flex-shrink-0">
                                         <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center">
@@ -415,7 +443,7 @@ const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, hand
                         <Button
                             type="submit"
                             className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                            disabled={isProcessing || !inputText.trim()}
+                            disabled={isProcessing || (!inputText.trim() && !file)}
                         >
                             <Send className="h-4 w-4 mr-1" /> Send
                         </Button>
@@ -434,6 +462,17 @@ const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, hand
                     </form>
                 </GlassCard>
             </motion.div>
+            {fullImage && (
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
+                    onClick={() => setFullImage(null)}
+                >
+                    <img src={fullImage} alt="Full view" className="max-w-[90%] max-h-[90%] object-contain" />
+                </motion.div>
+            )}
         </motion.div>
     );
 };
