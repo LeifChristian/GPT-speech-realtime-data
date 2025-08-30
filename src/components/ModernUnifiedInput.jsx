@@ -364,6 +364,7 @@ ModernUnifiedInput.propTypes = {
     downloadConvo: PropTypes.func.isRequired,
     rez: PropTypes.string.isRequired,
     handleGreeting: PropTypes.func.isRequired,
+    appendQuestionToHistory: PropTypes.func.isRequired,
 };
 
 export default ModernUnifiedInput;

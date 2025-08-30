@@ -46,17 +46,11 @@ export const useConversations = (apiKey, setRez, handleResponse) => {
 
   const createAndSelectConversation = async () => {
     const now = new Date();
-    const formattedDate = now.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: 'numeric',
-      hour12: true
-    }).replace(',', '');
+    const formattedDate = now.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) + ' ' + now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 
     const newConversation = {
       id: Date.now().toString(),
-      name: `Conv_${formattedDate}`,
+      name: `Convo ${formattedDate}`,
       history: ''
     };
 
