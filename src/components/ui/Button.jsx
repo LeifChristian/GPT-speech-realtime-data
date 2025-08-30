@@ -11,7 +11,6 @@ const Button = React.forwardRef(({
     disabled,
     onClick,
     onTouchEnd,
-    onPointerUp,
     type = 'button',
     ...props
 }, ref) => {
@@ -52,7 +51,6 @@ const Button = React.forwardRef(({
             type={type}
             onClick={onClick}
             onTouchEnd={onTouchEnd || ((e) => { if (onClick) { e.preventDefault(); onClick(e); } })}
-            onPointerUp={onPointerUp || ((e) => { if (onClick) { onClick(e); } })}
             style={{ touchAction: 'manipulation' }}
             whileHover={{ scale: disabled ? 1 : 1.02 }}
             whileTap={{ scale: disabled ? 1 : 0.98 }}

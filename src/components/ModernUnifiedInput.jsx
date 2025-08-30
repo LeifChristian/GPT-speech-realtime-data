@@ -141,6 +141,10 @@ const ModernUnifiedInput = ({
 
         try {
             if (file) {
+                // Add the user's question about the image to history
+                if (enteredText && enteredText.trim()) {
+                    await handleGreeting(enteredText);
+                }
                 await handleImageAnalysis(enteredText);
                 clearFile();
             } else {
@@ -154,21 +158,7 @@ const ModernUnifiedInput = ({
                         handleResponse(`Generated image: ${enteredText}`, false, imageResponse);
                     }
                 } else {
-                    const res = await debugFetch('chat-greeting', apiUrl('chat/greeting'), {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            text: `${enteredText}`,
-                            code: process.env.REACT_APP_API_KEY
-                        })
-                    }, pushDebug);
-                    if (res.ok) {
-                        const data = await res.json();
-                        handleResponse(data.reply);
-                    } else {
-                        setDebugOpen(true);
-                        handleResponse(`Error sending message (status ${res.status}).`);
-                    }
+                    await handleGreeting(enteredText);
                 }
             }
             setEnteredText('');

@@ -1,7 +1,7 @@
 import { apiUrl } from '../utils/api';
 import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, MessageSquare, User, Bot, ImagePlus, Send } from 'lucide-react';
+import { X, MessageSquare, User, Bot, ImagePlus, Send, Square, Play, Pause } from 'lucide-react';
 import { Button } from './ui/Button';
 import { GlassCard } from './ui/Card';
 
@@ -10,6 +10,7 @@ const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, hand
     const [inputText, setInputText] = useState('');
     const [dragActive, setDragActive] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [isSpeaking, setIsSpeaking] = useState(false);
     const fileInputRef = useRef(null);
 
     // Parse conversation history better
@@ -104,7 +105,7 @@ const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, hand
             });
             if (!res.ok) throw new Error('Image analyze failed');
             const data = await res.json();
-            // Persist and TTS via shared handler
+            // Persist and TTS via shared handler (also add to history)
             handleResponse(data.content);
             // Create a local blob URL for thumbnail persistence during session
             const blobUrl = URL.createObjectURL(file);
@@ -255,8 +256,21 @@ const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, hand
                         ))}
                     </div>
 
-                    {/* Footer: stacked input with auto-grow and send below */}
+                    {/* Footer: controls + stacked input with auto-grow and send below */}
                     <form onSubmit={handleSubmit} className="p-6 border-t border-white/10 space-y-2">
+                        <div className="flex items-center justify-end gap-2">
+                            <Button type="button" variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={() => { window.speechSynthesis.cancel(); setIsSpeaking(false); }} title="Stop speech" aria-label="Stop speech">
+                                <Square className="h-5 w-5" />
+                            </Button>
+                            <Button type="button" variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={() => {
+                                if (window.speechSynthesis.speaking) { window.speechSynthesis.pause(); setIsSpeaking(false); } else { window.speechSynthesis.resume(); setIsSpeaking(true); }
+                            }} title="Play/Pause" aria-label="Play/Pause">
+                                {isSpeaking ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+                            </Button>
+                            <Button type="button" variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={() => fileInputRef.current?.click()} title="Upload image" aria-label="Upload image">
+                                <ImagePlus className="h-5 w-5" />
+                            </Button>
+                        </div>
                         <div
                             className={`bg-gray-800/50 rounded-xl p-2 border ${dragActive ? 'border-blue-400' : 'border-white/10'}`}
                             onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setDragActive(true); }}
@@ -280,20 +294,7 @@ const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, hand
                                 className="hidden"
                                 onChange={handleFileSelect}
                             />
-                            <div className="flex justify-end pt-2">
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="text-white hover:bg-white/10"
-                                    onClick={() => fileInputRef.current?.click()}
-                                    title="Upload image"
-                                    aria-label="Upload image"
-                                    disabled={isProcessing}
-                                >
-                                    <ImagePlus className="h-5 w-5" />
-                                </Button>
-                            </div>
+                            <div className="flex justify-end pt-2" />
                         </div>
                         <Button
                             type="submit"

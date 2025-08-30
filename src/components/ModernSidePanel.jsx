@@ -28,9 +28,15 @@ const ModernSidePanel = ({
 
     const handleAddConversation = (e) => {
         e.stopPropagation();
+        // Show one prompt here only; hook will not prompt again
         const conversationName = prompt('Enter a name for the new conversation');
         if (conversationName) {
-            onAddConversation(conversationName);
+            const created = onAddConversation(conversationName);
+            // Auto-select and close panel
+            if (created && created.id) {
+                handleSelectConversation(created.id, created);
+            }
+            setIsOpen(false);
         }
     };
 
@@ -66,9 +72,25 @@ const ModernSidePanel = ({
 
     return (
         <>
-            {/* Hamburger Menu Button */}
+            {/* Hamburger Menu Button (left) */}
             <motion.div
                 className="fixed top-4 left-4 z-50"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+            >
+                <Button
+                    variant="glass"
+                    size="icon"
+                    onClick={togglePanel}
+                    className="bg-black/20 hover:bg-black/40 text-white border-white/20"
+                >
+                    <Menu className="h-5 w-5" />
+                </Button>
+            </motion.div>
+
+            {/* Mirror Menu Button (right) for easier access on mobile */}
+            <motion.div
+                className="fixed top-4 right-4 z-50"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
             >

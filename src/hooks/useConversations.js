@@ -260,10 +260,13 @@ export const useConversations = (apiKey, setRez, handleResponse) => {
       console.log('Nothing to export.');
       return;
     }
-    const conversationBlob = new Blob(
-      [conversationHistory],
-      { type: 'text/plain;charset=utf-8' }
-    );
+    const conversationBlob = new Blob([
+      // Ensure Questions and Responses are on new lines for readability
+      String(conversationHistory)
+        .replace(/\s*Question:\s*/g, '\nQuestion: ')
+        .replace(/\s*Response:\s*/g, '\nResponse: ')
+        .trim()
+    ], { type: 'text/plain;charset=utf-8' });
     const blobUrl = URL.createObjectURL(conversationBlob);
     const tempLink = document.createElement('a');
     tempLink.href = blobUrl;
