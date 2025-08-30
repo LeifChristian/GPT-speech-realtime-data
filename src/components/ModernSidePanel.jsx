@@ -88,22 +88,6 @@ const ModernSidePanel = ({
                 </Button>
             </motion.div>
 
-            {/* Mirror Menu Button (right) for easier access on mobile */}
-            <motion.div
-                className="fixed top-4 right-4 z-50"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-            >
-                <Button
-                    variant="glass"
-                    size="icon"
-                    onClick={togglePanel}
-                    className="bg-black/20 hover:bg-black/40 text-white border-white/20"
-                >
-                    <Menu className="h-5 w-5" />
-                </Button>
-            </motion.div>
-
             {/* Overlay: click outside closes (all viewports) */}
             <AnimatePresence>
                 {isOpen && (

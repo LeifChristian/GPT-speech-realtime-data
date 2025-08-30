@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, Image } from "lucide-react";
 import "./App.css";
 import ModernSidePanel from "./components/ModernSidePanel";
 import ModernConversationOverlay from "./components/ModernConversationOverlay";
@@ -26,6 +26,7 @@ function App() {
   const [sessionImages, setSessionImages] = useState([]);
   const [conversationThumbnails, setConversationThumbnails] = useState({});
   const [currentConversationName, setCurrentConversationName] = useState('');
+  const [isImageSidebarOpen, setIsImageSidebarOpen] = useState(false);
   const responseRef = useRef(null);
 
   // Speech controls are initialized after we get handleGreeting from conversations
@@ -42,6 +43,7 @@ function App() {
     if (imageData && imageData.type === 'image') {
       setGeneratedImage(imageData.content);
       setIsImageModalOpen(false);
+      setIsImageSidebarOpen(true); // Auto-open on generate
       // Add to session images
       const newImage = {
         id: Date.now(),
@@ -195,7 +197,7 @@ function App() {
       <div className="absolute inset-0 bg-gradient-to-br from-gray-900/30 via-gray-800/40 to-black/60 pointer-events-none" />
 
       {/* Toggle Conversation History Button (top-right, offset when image sidebar present) */}
-      <motion.div className={`fixed top-4 ${sessionImages.length ? 'right-24' : 'right-4'} z-[60]`} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+      <motion.div className="fixed top-4 right-4 z-[60]" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
         <Button
           variant="glass"
           size="icon"
@@ -208,6 +210,21 @@ function App() {
           <MessageSquare className="h-5 w-5" />
         </Button>
       </motion.div>
+
+      {/* Add toggle if images */}
+      {sessionImages.length > 0 && (
+        <motion.div className="fixed top-16 right-4 z-50" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+          <Button
+            variant="glass"
+            size="icon"
+            onClick={() => setIsImageSidebarOpen(!isImageSidebarOpen)}
+            className="bg-black/20 hover:bg-black/40 text-white border-white/20"
+            aria-label="Toggle image sidebar"
+          >
+            <Image className="h-5 w-5" />
+          </Button>
+        </motion.div>
+      )}
 
       <ModernSidePanel
         onSelectConversation={onSelectConversation}
@@ -244,13 +261,15 @@ function App() {
           setIsImageModalOpen(true);
         }}
         generatedImage={generatedImage}
+        isOpen={isImageSidebarOpen}
+        onClose={() => setIsImageSidebarOpen(false)}
       />
 
       <main className="min-h-screen flex flex-col items-center justify-center p-4 relative z-10">
         {/* Current conversation name */}
         {currentConversationName && (
-          <div className="absolute top-16 left-1/2 -translate-x-1/2 text-white font-bold text-lg text-center max-w-xs break-words">
-            {currentConversationName}
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 text-white font-bold text-lg text-center max-w-xs break-words ellipsis" style={{ fontSize: '12px' }}>
+            {currentConversationName.length > 30 ? currentConversationName.slice(0, 30) + '...' : currentConversationName}
           </div>
         )}
 
