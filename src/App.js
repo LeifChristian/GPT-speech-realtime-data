@@ -148,7 +148,7 @@ function App() {
 
   // Auto-sync when the hook creates/selects a conversation (e.g., first prompt)
   useEffect(() => {
-    if (hookSelectedConversationId && hookSelectedConversationId !== selectedConversationId) {
+    if (hookSelectedConversationId) {
       setSelectedConversationId(hookSelectedConversationId);
       if (thisConversation) {
         setThisConversation(thisConversation);
@@ -161,9 +161,8 @@ function App() {
         }
         setCurrentConversationName(conversationName);
       }
-      setIsOverlayVisible(true);
     }
-  }, [hookSelectedConversationId, thisConversation, selectedConversationId, setThisConversation]);
+  }, [hookSelectedConversationId, thisConversation, setThisConversation]);
 
   usePasswordProtection();
 
