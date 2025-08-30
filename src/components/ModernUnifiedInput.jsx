@@ -160,6 +160,7 @@ const ModernUnifiedInput = ({
                         handleResponse(`Generated image: ${enteredText}`, false, imageResponse);
                     }
                 } else {
+                    // Use handleGreeting which auto-creates conversation if none selected
                     await handleGreeting(enteredText);
                 }
             }

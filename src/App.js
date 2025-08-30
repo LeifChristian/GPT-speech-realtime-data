@@ -152,7 +152,14 @@ function App() {
       setSelectedConversationId(hookSelectedConversationId);
       if (thisConversation) {
         setThisConversation(thisConversation);
-        setCurrentConversationName(thisConversation.name || '');
+        let conversationName = thisConversation.name;
+        if (!conversationName) {
+          const now = new Date();
+          const date = now.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
+          const time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+          conversationName = `Convo ${date} ${time}`;
+        }
+        setCurrentConversationName(conversationName);
       }
       setIsOverlayVisible(true);
     }
@@ -245,9 +252,9 @@ function App() {
           initial={{ opacity: 0, y: -30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, type: "spring" }}
-          className="text-center mb-8"
+          className="text-center mb-4"
         >
-          <h1 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-blue-300 via-purple-300 to-cyan-300 bg-clip-text text-transparent mb-4">
+          <h1 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-blue-300 via-purple-300 to-cyan-300 bg-clip-text text-transparent mb-2">
             ΩmnÎbot
           </h1>
           <p className="text-gray-400 text-lg">
@@ -260,7 +267,7 @@ function App() {
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5, delay: 0.2 }}
-          className="mb-8"
+          className="mb-4"
         >
           <AudioControls
             windowWidth={windowWidth}
@@ -283,7 +290,7 @@ function App() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.4 }}
-          className="w-full max-w-4xl mb-8"
+          className="w-full max-w-4xl mb-4"
         >
           <ModernUnifiedInput
             enteredText={enteredText}
