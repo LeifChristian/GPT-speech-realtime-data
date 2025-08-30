@@ -18,7 +18,8 @@ const ModernUnifiedInput = ({
     downloadConvo,
     rez,
     handleGreeting,
-    appendQuestionToHistory
+    appendQuestionToHistory,
+    appendResponseToHistory
 }) => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [debugOpen, setDebugOpen] = useState(false);
@@ -144,20 +145,24 @@ const ModernUnifiedInput = ({
             if (file) {
                 // Add the user's question about the image to history immediately
                 if (enteredText && enteredText.trim()) {
-                    await appendQuestionToHistory(enteredText.trim());
+                    appendQuestionToHistory(enteredText.trim());
                 }
-                await handleImageAnalysis(enteredText);
+                const analysisResponse = await handleImageAnalysis(enteredText);
+                if (analysisResponse) {
+                    appendResponseToHistory(analysisResponse.content);
+                }
                 clearFile();
             } else {
                 const classificationType = await classifyPrompt(enteredText);
 
                 if (classificationType === 'image_generation') {
                     handleResponse('Creating your image...', true);
-                    await appendQuestionToHistory(enteredText.trim());
+                    appendQuestionToHistory(enteredText.trim());
                     const imageResponse = await handleImageGeneration(enteredText);
 
                     if (imageResponse && imageResponse.type === 'image') {
                         handleResponse(`Generated image: ${enteredText}`, false, imageResponse);
+                        appendResponseToHistory(`Generated image: ${enteredText}`);
                     }
                 } else {
                     // Use handleGreeting which auto-creates conversation if none selected
@@ -366,6 +371,7 @@ ModernUnifiedInput.propTypes = {
     rez: PropTypes.string.isRequired,
     handleGreeting: PropTypes.func.isRequired,
     appendQuestionToHistory: PropTypes.func.isRequired,
+    appendResponseToHistory: PropTypes.func.isRequired,
 };
 
 export default ModernUnifiedInput;

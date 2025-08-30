@@ -85,8 +85,9 @@ app.use((req, res) => {
 
 // Start server
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
+const HOST = process.env.NODE_ENV === 'development' ? 'localhost' : undefined;
+app.listen(PORT, HOST, () => {
+  console.log(`Server listening on ${HOST || 'all interfaces'}:${PORT}`);
 });
 
 // Handle uncaught exceptions

@@ -57,9 +57,6 @@ function App() {
       setRez(response1);
       speakText(response1);
     }
-    const responseText = imageData ? `Generated image: ${enteredText}` : response1;
-    // Persist response to the selected conversation
-    appendResponseToHistory(responseText);
     // Auto-scroll to response on mobile
     setTimeout(() => {
       try {
@@ -147,17 +144,25 @@ function App() {
     setCurrentConversationName(selected?.name || '');
   }, [conversations, selectedConversationId]);
 
+  // Force conversations refresh when debugLog changes (indicates hook activity)
+  useEffect(() => {
+    if (debugLog.length > 0) {
+      const stored = JSON.parse(localStorage.getItem('conversations') || '[]');
+      // Only update if different to avoid loops
+      if (JSON.stringify(stored) !== JSON.stringify(conversations)) {
+        // Trigger a re-render by updating conversations in the next tick
+        setTimeout(() => {
+          window.dispatchEvent(new Event('storage'));
+        }, 10);
+      }
+    }
+  }, [debugLog, conversations]);
+
   // Auto-sync when the hook creates/selects a conversation (e.g., first prompt)
   useEffect(() => {
     if (hookSelectedConversationId) {
       setSelectedConversationId(hookSelectedConversationId);
-      // Force refresh conversations from localStorage to catch new ones
-      const stored = JSON.parse(localStorage.getItem('conversations') || '[]');
-      const found = stored.find(c => c.id === hookSelectedConversationId);
-      if (found) {
-        setThisConversation(found);
-        setCurrentConversationName(found.name || 'Untitled');
-      } else if (thisConversation) {
+      if (thisConversation) {
         setThisConversation(thisConversation);
         setCurrentConversationName(thisConversation.name || 'Untitled');
       }
@@ -247,12 +252,7 @@ function App() {
           </div>
         )}
 
-        {/* Debug log for conversation creation */}
-        {debugLog.length > 0 && (
-          <div className="absolute top-32 left-4 bg-black/80 text-white text-xs p-2 rounded max-w-sm max-h-32 overflow-y-auto">
-            {debugLog.map((log, i) => <div key={i}>{log}</div>)}
-          </div>
-        )}
+
         {/* Modern Header */}
         <motion.div
           initial={{ opacity: 0, y: -30 }}
