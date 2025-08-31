@@ -461,14 +461,16 @@ async function get_realtime_data(query) {
     console.log('[PPLX] live search HIT', { query: String(query || '').slice(0, 160) });
     const system = [
       'You are a research assistant with live web access. Perform real-time public web search and aggregate findings.',
-      'Return up to 10 items with EXACTLY this text-only structure per item:',
+      'Return up to 10 items with EXACTLY this text-only structure per item and DO NOT deviate:',
       'Name: <title>\\nLink: <https url>\\nSnippet: <concise summary>\\n',
-      'Include the source URL on the Link line. Keep output concise for TTS; avoid boilerplate like Read more.'
+      'Links are MANDATORY; if no credible source URL is available, omit the item. Keep output concise for TTS; avoid boilerplate like Read more.'
     ].join(' ');
 
+    const model = process.env.PPLX_MODEL || 'sonar-pro';
     const payload = {
-      model: process.env.PPLX_MODEL || 'sonar',
+      model,
       temperature: 0.2,
+      return_citations: true, // ask API to include citations if available
       messages: [
         { role: 'system', content: system },
         { role: 'user', content: String(query || '').slice(0, 4000) }
@@ -487,9 +489,88 @@ async function get_realtime_data(query) {
       }
     );
 
-    const text = resp?.data?.choices?.[0]?.message?.content?.trim();
-    console.log('[PPLX] live search RESULT preview:', text ? text.slice(0, 400) : text);
-    return text || 'No results found.';
+    let text = resp?.data?.choices?.[0]?.message?.content?.trim();
+    let citations = resp?.data?.citations || resp?.data?.choices?.[0]?.message?.citations || [];
+    const hasLinksInText = /https?:\/\//i.test(text || '');
+    console.log('[PPLX] live search RESULT preview:', text ? text.slice(0, 400) : text, 'model=', model, 'citations=', Array.isArray(citations) ? citations.length : 0);
+
+    if (!hasLinksInText && Array.isArray(citations) && citations.length) {
+      // Build a link block compatible with our UI parsing
+      const citeBlock = citations.slice(0, 10).map((u, idx) => {
+        const url = typeof u === 'string' ? u : (u?.url || '');
+        if (!url) return '';
+        return `Name: Source ${idx + 1}\nLink: ${url}\nSnippet: See source.\n`;
+      }).filter(Boolean).join('\n');
+      text = text ? `${text}\n\n${citeBlock}` : citeBlock;
+    }
+
+    // Retry once with a stricter instruction if we still have no links and no citations
+    if (!/https?:\/\//i.test(text || '') && (!Array.isArray(citations) || citations.length === 0)) {
+      console.warn('[PPLX] No links/citations. Retrying with stricter prompt.');
+      const strictSystem = [
+        'You MUST return up to 8 findings. Each finding MUST include a valid https URL on a separate line labeled Link: and a one-sentence Snippet.',
+        'Output format per item is EXACTLY:',
+        'Name: <title>\nLink: <https url>\nSnippet: <concise summary>\n',
+        'Do not include items without a credible source URL.'
+      ].join(' ');
+      const retryPayload = { ...payload, messages: [{ role: 'system', content: strictSystem }, { role: 'user', content: String(query || '').slice(0, 4000) }] };
+      const retry = await axios.post('https://api.perplexity.ai/chat/completions', retryPayload, { headers: payload.headers || { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, timeout: 20000 });
+      const retryText = retry?.data?.choices?.[0]?.message?.content?.trim();
+      const retryCites = retry?.data?.citations || retry?.data?.choices?.[0]?.message?.citations || [];
+      let finalText = retryText;
+      if (!/https?:\/\//i.test(finalText || '') && Array.isArray(retryCites) && retryCites.length) {
+        const block = retryCites.slice(0, 8).map((u, idx) => {
+          const url = typeof u === 'string' ? u : (u?.url || '');
+          if (!url) return '';
+          return `Name: Source ${idx + 1}\nLink: ${url}\nSnippet: See source.\n`;
+        }).filter(Boolean).join('\n');
+        finalText = finalText ? `${finalText}\n\n${block}` : block;
+      }
+      if (finalText) text = finalText;
+    }
+
+    if (!text) text = 'No results found.';
+
+    // Post-validate links: keep only reachable https URLs, drop dead links
+    try {
+      const blockRegex = /Name:\s*(.*)\nLink:\s*(\S+)\nSnippet:\s*([\s\S]*?)(?=\n\n|$)/g;
+      const entries = [];
+      let m;
+      while ((m = blockRegex.exec(text)) !== null) {
+        entries.push({ name: m[1].trim(), url: m[2].trim(), snippet: m[3].trim() });
+      }
+
+      if (entries.length) {
+        const validate = async (u) => {
+          try {
+            let url = new URL(u);
+            if (url.protocol !== 'https:') {
+              // try upgrading to https
+              url = new URL(u.replace(/^http:/, 'https:'));
+            }
+            const resp = await axios.get(url.href, { maxRedirects: 3, timeout: 5000, validateStatus: (s) => s >= 200 && s < 400 });
+            return resp.status < 400 ? url.href : null;
+          } catch {
+            return null;
+          }
+        };
+        const results = await Promise.all(entries.map(e => validate(e.url)));
+        const filtered = entries
+          .map((e, i) => ({ ...e, url: results[i] }))
+          .filter(e => !!e.url)
+          .slice(0, 10);
+        if (filtered.length) {
+          const rebuilt = filtered.map((e) => `Name: ${e.name}\nLink: ${e.url}\nSnippet: ${e.snippet}\n`).join('\n');
+          text = rebuilt; // replace with validated list to avoid dead links
+        } else {
+          console.warn('[PPLX] All links failed validation; returning original text.');
+        }
+      }
+    } catch (e) {
+      console.warn('[PPLX] Link validation error:', e?.message);
+    }
+
+    return text;
   } catch (error) {
     const status = error.response?.status;
     const data = error.response?.data;

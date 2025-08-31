@@ -73,7 +73,12 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
       return text.replace(urlPattern, '');
     }
 
-    text = removeUrls(text);
+    text = removeUrls(text || "");
+    if (!text.trim()) {
+      setShowPlayPause(false);
+      setIsPlaying(false);
+      return;
+    }
     setShowPlayPause(true);
 
     if (typeof window !== 'undefined' && "speechSynthesis" in window) {
@@ -138,9 +143,12 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
             .replaceAll('?', '')
             .replaceAll(":", "")
         );
-
         const voices = speechSynthesis.getVoices();
-        utterance.voice = voices[5] || voices[0] || null;
+        const preferred = voices.find(v => /en/i.test(v.lang) && /(Google US|Samantha|Microsoft|Female|Natural)/i.test(v.name))
+          || voices.find(v => /en/i.test(v.lang))
+          || voices[0];
+        if (preferred) utterance.voice = preferred;
+        utterance.rate = 1.0;
         utterance.onend = synthesizeSegments;
         speechSynthesis.speak(utterance);
         setIsPlaying(true);
@@ -148,7 +156,11 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
 
       // Ensure voices are loaded before starting synthesis
       if (speechSynthesis.getVoices().length === 0) {
-        speechSynthesis.onvoiceschanged = () => synthesizeSegments();
+        const handler = () => {
+          synthesizeSegments();
+          speechSynthesis.onvoiceschanged = null;
+        };
+        speechSynthesis.onvoiceschanged = handler;
       } else {
         synthesizeSegments();
       }
