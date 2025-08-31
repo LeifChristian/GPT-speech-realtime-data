@@ -191,6 +191,27 @@ function App() {
     setIsOverlayVisible(false);
   };
 
+  // Render URLs as clickable links that open in a new tab
+  const renderTextWithLinks = (text) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    return String(text || '').split(urlRegex).map((part, idx) => {
+      if (urlRegex.test(part)) {
+        return (
+          <a
+            key={`lnk-${idx}`}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-400 hover:text-blue-300 underline"
+          >
+            {part}
+          </a>
+        );
+      }
+      return <span key={`txt-${idx}`}>{part}</span>;
+    });
+  };
+
   return (
     <div className="min-h-screen relative overflow-x-hidden">
       {/* Background Effects - semi-transparent gradient over Matrix image */}
@@ -228,7 +249,15 @@ function App() {
 
       <ModernSidePanel
         onSelectConversation={onSelectConversation}
-        onAddConversation={handleAddConversation}
+        onAddConversation={(name) => {
+          const created = handleAddConversation(name);
+          // Clear UI state for a fresh conversation
+          setEnteredText('');
+          setRez('');
+          setGeneratedImage(null);
+          stopSpeakText();
+          return created;
+        }}
         onRenameConversation={handleRenameConversation}
         onDeleteConversation={handleDeleteConversation}
         setThisConversation={setThisConversation}
@@ -346,7 +375,7 @@ function App() {
             >
               <div className="glass-dark p-6 rounded-xl text-gray-100 text-lg leading-relaxed max-h-96 overflow-y-auto">
                 <div className="whitespace-pre-wrap font-medium">
-                  {rez}
+                  {renderTextWithLinks(rez)}
                 </div>
               </div>
             </motion.div>

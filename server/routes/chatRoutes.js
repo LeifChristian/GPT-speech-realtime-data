@@ -462,8 +462,8 @@ async function get_realtime_data(query) {
     const system = [
       'You are a research assistant with live web access. Perform real-time public web search and aggregate findings.',
       'Return up to 10 items with EXACTLY this text-only structure per item:',
-      'Name: <title>\\nSnippet: <concise summary>\\n',
-      'Remove boilerplate like Read more. Keep output concise for TTS.'
+      'Name: <title>\\nLink: <https url>\\nSnippet: <concise summary>\\n',
+      'Include the source URL on the Link line. Keep output concise for TTS; avoid boilerplate like Read more.'
     ].join(' ');
 
     const payload = {
