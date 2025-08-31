@@ -1,4 +1,4 @@
-// // routes/chatRoutes.js
+
 // const express = require('express');
 // const router = express.Router();
 // const axios = require('axios');
@@ -413,42 +413,93 @@ async function get_shows(query) {
   }
 }
 
-async function get_realtime_data(query) {
-  const subscriptionKey = process.env.bingAPIKey || process.env.BING_API_KEY || process.env.BINGAPIKEY;
-  const uriBase = "https://api.bing.microsoft.com/v7.0/search";
-  const searchTerm = encodeURIComponent(query || "");
-  const url = `${uriBase}?q=${searchTerm}&count=20&mkt=en-US`;
+// async function get_realtime_data(query) {
+//   const subscriptionKey = process.env.bingAPIKey || process.env.BING_API_KEY || process.env.BINGAPIKEY;
+//   const uriBase = "https://api.bing.microsoft.com/v7.0/search";
+//   const searchTerm = encodeURIComponent(query || "");
+//   const url = `${uriBase}?q=${searchTerm}&count=20&mkt=en-US`;
 
-  if (!subscriptionKey) {
-    console.error('[BING] Missing API key. Set env var bingAPIKey or BING_API_KEY. Query=', query);
-    return 'Error: Bing API key is not configured on the server.';
+//   if (!subscriptionKey) {
+//     console.error('[BING] Missing API key. Set env var bingAPIKey or BING_API_KEY. Query=', query);
+//     return 'Error: Bing API key is not configured on the server.';
+//   }
+
+//   try {
+//     console.log(`[BING] GET ${url}`);
+//     const response = await axios.get(url, {
+//       headers: { 'Ocp-Apim-Subscription-Key': subscriptionKey },
+//       timeout: 10000,
+//     });
+
+//     let result = '';
+//     if (response?.data?.webPages?.value) {
+//       response.data.webPages.value.forEach((webPage) => {
+//         result += `Name: ${webPage.name}\n`;
+//         result += `Snippet: ${webPage.snippet}\n\n`;
+//       });
+//     }
+//     console.log(`[BING] Results: ${response?.data?.webPages?.value?.length || 0} items`);
+//     return result || 'No results found.';
+//   } catch (error) {
+//     const status = error.response?.status;
+//     const data = error.response?.data;
+//     console.error('[BING] Error', { status, data, message: error.message });
+//     return `Error fetching search results: ${status || ''}`.trim();
+//   }
+// }
+
+// Perplexity-based realtime data function (above bing api version deprecated)
+
+async function get_realtime_data(query) {
+  const apiKey = process.env.PERPLEXITY_API_KEY;
+  if (!apiKey) {
+    console.error('[PPLX] Missing perplexityAPIKey');
+    return 'Error: Perplexity API key is not configured on the server.';
   }
 
   try {
-    console.log(`[BING] GET ${url}`);
-    const response = await axios.get(url, {
-      headers: { 'Ocp-Apim-Subscription-Key': subscriptionKey },
-      timeout: 10000,
-    });
+    console.log('[PPLX] live search HIT', { query: String(query || '').slice(0, 160) });
+    const system = [
+      'You are a research assistant with live web access. Perform real-time public web search and aggregate findings.',
+      'Return up to 10 items with EXACTLY this text-only structure per item:',
+      'Name: <title>\\nSnippet: <concise summary>\\n',
+      'Remove boilerplate like Read more. Keep output concise for TTS.'
+    ].join(' ');
 
-    let result = '';
-    if (response?.data?.webPages?.value) {
-      response.data.webPages.value.forEach((webPage) => {
-        result += `Name: ${webPage.name}\n`;
-        result += `Snippet: ${webPage.snippet}\n\n`;
-      });
-    }
-    console.log(`[BING] Results: ${response?.data?.webPages?.value?.length || 0} items`);
-    return result || 'No results found.';
+    const payload = {
+      model: process.env.PPLX_MODEL || 'sonar',
+      temperature: 0.2,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: String(query || '').slice(0, 4000) }
+      ],
+    };
+
+    const resp = await axios.post(
+      'https://api.perplexity.ai/chat/completions',
+      payload,
+      {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 20000,
+      }
+    );
+
+    const text = resp?.data?.choices?.[0]?.message?.content?.trim();
+    console.log('[PPLX] live search RESULT preview:', text ? text.slice(0, 400) : text);
+    return text || 'No results found.';
   } catch (error) {
     const status = error.response?.status;
     const data = error.response?.data;
-    console.error('[BING] Error', { status, data, message: error.message });
+    console.error('[PPLX] Error', { status, data: typeof data === 'string' ? data.slice(0, 200) : data, message: error.message });
     return `Error fetching search results: ${status || ''}`.trim();
   }
 }
 
 // OpenAI function definitions
+
 const functions = [
   {
     name: 'get_current_weather',

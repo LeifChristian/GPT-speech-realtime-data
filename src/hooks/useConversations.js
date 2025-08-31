@@ -113,13 +113,24 @@ export const useConversations = (apiKey, setRez, handleResponse) => {
         addDebugLog(`Created and selected conversation: ${currentConversation.id}`);
       }
 
-      // Append question locally
+      // Append question locally (timestamps are NOT stored in history)
       let updatedHistory = currentConversation.history ? `${currentConversation.history} Question: ${theStuff}` : `Question: ${theStuff}`;
       let updatedConversation = { ...currentConversation, history: updatedHistory };
 
-      // Send request
+      // Send request with a CURRENT timestamp used ONLY for model reasoning (not persisted)
+      const currentIsoTimestamp = new Date().toISOString();
+      const instruction = [
+        'Text before this sentence is conversation history so far between you and me.',
+        'The following ISO-8601 timestamp is the ACTUAL current date/time and should be treated as ground truth for any time-sensitive reasoning:',
+        `TIMESTAMP: ${currentIsoTimestamp}`,
+        'Do NOT include the timestamp in your response or repeat it back. Use it only for context.',
+        'If the user asks for current information or a web search, use the available functions to fetch up-to-date data, then summarize clearly.',
+        'Keep responses concise and suitable for text-to-speech.'
+      ].join(' ');
+
+      // Important: timestamps are NOT added to updatedHistory, only into the instruction sent to the model
       const payload = {
-        text: `${updatedHistory} <-- Text before this sentence is conversation history so far between you and me. Do NOT include timestamps in responses, timestamps provide context for when this conversation is taking place. responses will be spoken back to user using TTS. Using this information and context, answer the following question, calling functions if asked current information -->  "${theStuff}"`,
+        text: `${updatedHistory} <-- ${instruction} -->  "${theStuff}"`,
         code: apiKey,
       };
 
