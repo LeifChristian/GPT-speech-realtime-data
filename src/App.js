@@ -1,13 +1,17 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { MessageSquare, Image } from "lucide-react";
 import "./App.css";
-import SidePanel from "./components/SidePanel";
-import ImageUpload from "./components/ImageUpload";
-import ConversationOverlay from "./components/ConversationOverlay";
-import ConversationInput from "./components/ConversationInput";
+import ModernSidePanel from "./components/ModernSidePanel";
+import ModernConversationOverlay from "./components/ModernConversationOverlay";
 import AudioControls from "./components/AudioControls";
+import ModernUnifiedInput from "./components/ModernUnifiedInput";
+import ModernImageSidebar from "./components/ModernImageSidebar";
 import { useConversations } from "./hooks/useConversations";
 import { useSpeech } from "./hooks/useSpeech";
 import { usePasswordProtection } from "./hooks/usePasswordProtection";
+import { Button } from "./components/ui/Button";
+import { apiUrl } from "./utils/api";
 
 const API_KEY = process.env.REACT_APP_API_KEY;
 
@@ -15,14 +19,104 @@ function App() {
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [enteredText, setEnteredText] = useState("");
   const [rez, setRez] = useState("");
-  const [isTextCleared, setIsTextCleared] = useState(false);
   const [isOverlayVisible, setIsOverlayVisible] = useState(false);
   const [selectedConversationId, setSelectedConversationId] = useState(null);
+  const [generatedImage, setGeneratedImage] = useState(null);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [sessionImages, setSessionImages] = useState([]);
+  const [conversationThumbnails, setConversationThumbnails] = useState({});
+  const [currentConversationName, setCurrentConversationName] = useState('');
+  const [isImageSidebarOpen, setIsImageSidebarOpen] = useState(false);
+  const responseRef = useRef(null);
+
+  // Speech controls are initialized after we get handleGreeting from conversations
+
+  const handleResponse = (response1, bool, imageData = null) => {
+    if (bool) {
+      // For temporary messages like "Analyzing your image..."
+      setRez(response1);
+      speakText(response1);
+      return;
+    }
+
+    // Handle image responses
+    if (imageData && imageData.type === 'image') {
+      setGeneratedImage(imageData.content);
+      setIsImageModalOpen(false);
+      setIsImageSidebarOpen(true); // Auto-open on generate
+      // Add to session images
+      const newImage = {
+        id: Date.now(),
+        url: imageData.content,
+        prompt: enteredText,
+        timestamp: new Date().toISOString()
+      };
+      setSessionImages(prev => [...prev, newImage]);
+      setRez(`Generated image: ${enteredText}`);
+      speakText(`I've created an image based on your prompt: ${enteredText}`);
+    } else {
+      // Handle text responses
+      setRez(response1);
+      speakText(response1);
+    }
+    // Auto-scroll to response on mobile
+    setTimeout(() => {
+      try {
+        if (responseRef.current) {
+          responseRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          window.scrollBy({ top: -80, behavior: 'smooth' });
+        }
+      } catch { }
+    }, 50);
+  };
+
+  const addConversationThumbnail = (conversationId, url, prompt) => {
+    if (!conversationId || !url) return;
+    setConversationThumbnails(prev => {
+      const list = prev[conversationId] || [];
+      const newThumb = { id: Date.now(), url, prompt: prompt || '', ts: Date.now() };
+      return { ...prev, [conversationId]: [...list, newThumb] };
+    });
+  };
+
+  const downloadCurrentImage = async (url) => {
+    try {
+      const response = await fetch(apiUrl(`image/download?url=${encodeURIComponent(url)}`));
+      if (!response.ok) throw new Error('Proxy download failed');
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `generated-image-${Date.now()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Download failed:', error);
+    }
+  };
 
   const {
-    isRecording,
+    conversations,
+    selectedConversationId: hookSelectedConversationId,
+    thisConversation,
+    handleAddConversation,
+    handleRenameConversation,
+    handleDeleteConversation,
+    clearConversationHistory,
+    handleGreeting,
+    downloadConvo,
+    setThisConversation,
+    handleSelectConversation: selectConversation,
+    appendResponseToHistory,
+    appendQuestionToHistory,
+    debugLog
+  } = useConversations(API_KEY, setRez, handleResponse);
+
+  // Now that handleGreeting is defined, wire up speech controls with correct args
+  const {
     startRecording,
-    stopRecording,
     isPlaying,
     showPlayPause,
     speakText,
@@ -31,54 +125,51 @@ function App() {
     pause,
     setShowPlayPause,
     setIsPlaying
-  } = useSpeech(setRez, setEnteredText);
+  } = useSpeech(setRez, handleGreeting, setEnteredText);
 
-  const handleResponse = (response1, bool) => {
-    if (bool) {
-      // For temporary messages like "Analyzing your image..."
-      setRez(response1);
-      speakText(response1);
-      return;
-    }
-
-    setRez(response1);  
-
-    const selectedConversation = conversations.find(
-      (conversation) => conversation.id === selectedConversationId
-    );
-
-    if (!selectedConversation) return;
-
-    const newHistory = `${selectedConversation.history} Response: ${response1}`;
-    const updatedConversations = conversations.map((conversation) =>
-      conversation.id === selectedConversationId
-        ? { ...conversation, history: newHistory }
-        : conversation
-    );
-
-    localStorage.setItem('conversations', JSON.stringify(updatedConversations));
-    speakText(response1);
-  };
-
-  const {
-    conversations,
-    thisConversation,
-    handleAddConversation,
-    handleRenameConversation,
-    handleDeleteConversation,
-    clearConversationHistory,
-    handleGreeting,
-    createAndSelectConversation,
-    downloadConvo,
-    setThisConversation
-  } = useConversations(API_KEY, setRez, handleResponse);
-
-  // New method for handling conversation selection
-  const handleSelectConversation = (conversationId, conversation) => {
+  // New method for handling conversation selection (sync with hook state)
+  const onSelectConversation = (conversationId, conversation) => {
+    // Update local UI state
     setSelectedConversationId(conversationId);
     setThisConversation(conversation);
+    setCurrentConversationName(conversation?.name || '');
     setIsOverlayVisible(true);
+    // Sync with hook's internal selection so features like Save work
+    if (typeof selectConversation === 'function') {
+      selectConversation(conversationId, conversation);
+    }
   };
+
+  // Keep header name in sync with selection and rename updates
+  useEffect(() => {
+    const selected = conversations.find(c => c.id === selectedConversationId);
+    setCurrentConversationName(selected?.name || '');
+  }, [conversations, selectedConversationId]);
+
+  // Force conversations refresh when debugLog changes (indicates hook activity)
+  useEffect(() => {
+    if (debugLog.length > 0) {
+      const stored = JSON.parse(localStorage.getItem('conversations') || '[]');
+      // Only update if different to avoid loops
+      if (JSON.stringify(stored) !== JSON.stringify(conversations)) {
+        // Trigger a re-render by updating conversations in the next tick
+        setTimeout(() => {
+          window.dispatchEvent(new Event('storage'));
+        }, 10);
+      }
+    }
+  }, [debugLog, conversations]);
+
+  // Auto-sync when the hook creates/selects a conversation (e.g., first prompt)
+  useEffect(() => {
+    if (hookSelectedConversationId) {
+      setSelectedConversationId(hookSelectedConversationId);
+      if (thisConversation) {
+        setThisConversation(thisConversation);
+        setCurrentConversationName(thisConversation.name || 'Untitled');
+      }
+    }
+  }, [hookSelectedConversationId, thisConversation, setThisConversation]);
 
   usePasswordProtection();
 
@@ -88,9 +179,11 @@ function App() {
     return () => window.removeEventListener("resize", handleWindowResize);
   }, []);
 
+  // Remove old sample auto-seed logic
+
   const sendStop = () => {
-    setIsTextCleared(prev => !prev);
     setRez('');
+    setGeneratedImage(null);
     stopSpeakText();
   };
 
@@ -98,79 +191,288 @@ function App() {
     setIsOverlayVisible(false);
   };
 
+  // Render URLs as clickable links that open in a new tab
+  const renderTextWithLinks = (text) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    return String(text || '').split(urlRegex).flatMap((part, idx) => {
+      if (urlRegex.test(part)) {
+        // Strip trailing punctuation from the matched URL but render it after the link
+        const cleaned = part.replace(/[)\]\}>,.:;!?]+$/g, '');
+        const trailing = part.slice(cleaned.length);
+        return [
+          <a
+            key={`lnk-${idx}`}
+            href={cleaned}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-400 hover:text-blue-300 underline"
+          >
+            {cleaned}
+          </a>,
+          trailing ? <span key={`punct-${idx}`}>{trailing}</span> : null,
+        ];
+      }
+      return <span key={`txt-${idx}`}>{part}</span>;
+    });
+  };
+
   return (
-    <div className="App">
-      <SidePanel
-        onSelectConversation={handleSelectConversation}
-        onAddConversation={handleAddConversation}
+    <div className="min-h-screen relative overflow-x-hidden">
+      {/* Background Effects - semi-transparent gradient over Matrix image */}
+      <div className="absolute inset-0 bg-gradient-to-br from-gray-900/30 via-gray-800/40 to-black/60 pointer-events-none" />
+
+      {/* Toggle Conversation History Button (top-right, offset when image sidebar present) */}
+      <motion.div className="fixed top-4 right-4 z-[60]" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+        <Button
+          variant="glass"
+          size="icon"
+          onClick={() => setIsOverlayVisible((v) => !v)}
+          disabled={!selectedConversationId}
+          className="text-white border-white/20"
+          aria-label="Toggle conversation history"
+          title={selectedConversationId ? "Show/Hide Conversation History" : "Select a conversation to view history"}
+        >
+          <MessageSquare className="h-5 w-5" />
+        </Button>
+      </motion.div>
+
+      {/* Add toggle if images */}
+      {sessionImages.length > 0 && (
+        <motion.div className="fixed top-16 right-4 z-50" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+          <Button
+            variant="glass"
+            size="icon"
+            onClick={() => setIsImageSidebarOpen(!isImageSidebarOpen)}
+            className="bg-black/20 hover:bg-black/40 text-white border-white/20"
+            aria-label="Toggle image sidebar"
+          >
+            <Image className="h-5 w-5" />
+          </Button>
+        </motion.div>
+      )}
+
+      <ModernSidePanel
+        onSelectConversation={onSelectConversation}
+        onAddConversation={(name) => {
+          const created = handleAddConversation(name);
+          // Clear UI state for a fresh conversation
+          setEnteredText('');
+          setRez('');
+          setGeneratedImage(null);
+          stopSpeakText();
+          return created;
+        }}
         onRenameConversation={handleRenameConversation}
         onDeleteConversation={handleDeleteConversation}
         setThisConversation={setThisConversation}
         selectedConversationId={selectedConversationId}
         conversations={conversations}
       />
-  
-      {isOverlayVisible && (
-        <ConversationOverlay
-          conversation={conversations.find(c => c.id === selectedConversationId)}
-          onClose={handleOverlayClose}
-        />
-      )}
-  
-      <header className="App-header">
-        <h1 style={{ color: 'lightgrey', marginTop: '2vh' }}>ΩmnÎbot-βeta</h1>
-  
-        <AudioControls
-          windowWidth={windowWidth}
-          isPlaying={isPlaying}
-          showPlayPause={showPlayPause}
-          startRecording={startRecording}
-          sendStop={sendStop}
-          stopSpeakText={stopSpeakText}
-          toggleMute={toggleMute}
-          pause={pause}
-          setRez={setRez}
-          setEnteredText={setEnteredText}
-          setShowPlayPause={setShowPlayPause}
-          setIsPlaying={setIsPlaying}
-        />
-  
-        <ImageUpload
-          sendStop={sendStop}
-          isTextCleared={isTextCleared}
-          setRez={setRez}
-          rez={rez}
-          handleResponse={handleResponse}
-        />
-  
-        <ConversationInput
-          enteredText={enteredText}
-          setEnteredText={setEnteredText}
-          handleGreeting={handleGreeting}
-          sendStop={sendStop}
-          clearConversationHistory={clearConversationHistory}
-          downloadConvo={downloadConvo}
-          rez={rez}
-        />
-  
-        {rez && (
-          <div style={{
-            color: "lightgrey",
-            fontSize: '1.2rem',
-            maxHeight: "50vh",
-            overflow: "auto",
-            width: "100%",
-            margin: 'auto',
-            marginTop: '1%',
-            fontWeight: 'bold',
-            textAlign: 'center',
-            whiteSpace: 'pre-wrap',
-            zIndex: 3000,
-          }}>
-            {rez}
+
+      <AnimatePresence>
+        {isOverlayVisible && (
+          <ModernConversationOverlay
+            conversation={conversations.find(c => c.id === selectedConversationId)}
+            onClose={handleOverlayClose}
+            handleGreeting={handleGreeting}
+            handleResponse={handleResponse}
+            appendQuestionToHistory={appendQuestionToHistory}
+            thumbnails={conversationThumbnails[selectedConversationId] || []}
+            addThumbnail={(url, prompt) => addConversationThumbnail(selectedConversationId, url, prompt)}
+            speakText={speakText}
+            updateMainResponse={(content) => setRez(content)}
+            appendResponseToHistory={appendResponseToHistory}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Modern Image Sidebar */}
+      <ModernImageSidebar
+        sessionImages={sessionImages}
+        onImageSelect={(url) => {
+          setGeneratedImage(url);
+          setIsImageModalOpen(true);
+        }}
+        generatedImage={generatedImage}
+        isOpen={isImageSidebarOpen}
+        onClose={() => setIsImageSidebarOpen(false)}
+      />
+
+      <main className="min-h-screen flex flex-col items-center justify-center p-4 relative z-10">
+        {/* Current conversation name */}
+        {currentConversationName && (
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 text-white font-bold text-lg text-center max-w-xs break-words ellipsis" style={{ fontSize: '12px' }}>
+            {currentConversationName.length > 30 ? currentConversationName.slice(0, 30) + '...' : currentConversationName}
           </div>
         )}
-      </header>
+
+
+        {/* Modern Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, type: "spring" }}
+          className="text-center mb-4"
+        >
+          <h1 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-blue-300 via-purple-300 to-cyan-300 bg-clip-text text-transparent mb-2">
+            ΩmnÎbot
+          </h1>
+          <p className="text-gray-400 text-lg">
+            Intelligent conversations with image generation
+          </p>
+        </motion.div>
+
+        {/* Audio Controls */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          className="mb-4"
+        >
+          <AudioControls
+            windowWidth={windowWidth}
+            isPlaying={isPlaying}
+            showPlayPause={showPlayPause}
+            startRecording={startRecording}
+            sendStop={sendStop}
+            stopSpeakText={stopSpeakText}
+            toggleMute={toggleMute}
+            pause={pause}
+            setRez={setRez}
+            setEnteredText={setEnteredText}
+            setShowPlayPause={setShowPlayPause}
+            setIsPlaying={setIsPlaying}
+          />
+        </motion.div>
+
+        {/* Modern Unified Input */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.4 }}
+          className="w-full max-w-4xl mb-4"
+        >
+          <ModernUnifiedInput
+            enteredText={enteredText}
+            setEnteredText={setEnteredText}
+            handleResponse={handleResponse}
+            sendStop={sendStop}
+            clearConversationHistory={clearConversationHistory}
+            downloadConvo={downloadConvo}
+            rez={rez}
+            handleGreeting={handleGreeting}
+            appendQuestionToHistory={appendQuestionToHistory}
+            appendResponseToHistory={appendResponseToHistory}
+          />
+        </motion.div>
+
+        {/* Response Display */}
+        <AnimatePresence>
+          {rez && (
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.95 }}
+              transition={{ duration: 0.4 }}
+              className="w-full max-w-4xl"
+              ref={responseRef}
+            >
+              <div className="glass-dark p-6 rounded-xl text-gray-100 text-lg leading-relaxed max-h-96 overflow-y-auto">
+                <div className="whitespace-pre-wrap font-medium">
+                  {renderTextWithLinks(rez)}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Generated Image Display (inline card with controls) */}
+        <AnimatePresence>
+          {generatedImage && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.5, type: "spring" }}
+              className="mt-8 cursor-pointer"
+              onClick={() => setIsImageModalOpen(true)}
+            >
+              <div className="glass-dark p-4 rounded-2xl">
+                <img
+                  src={generatedImage}
+                  alt="Generated"
+                  className="max-w-full max-h-96 rounded-xl shadow-2xl object-contain"
+                />
+                <div className="flex justify-center gap-4 mt-3 text-gray-300 text-sm">
+                  <button
+                    className="px-3 py-1 rounded-md bg-white/10 hover:bg-white/20"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsImageModalOpen(true);
+                    }}
+                  >
+                    Expand
+                  </button>
+                  <button
+                    className="px-3 py-1 rounded-md bg-white/10 hover:bg-white/20"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setGeneratedImage(null);
+                    }}
+                  >
+                    X
+                  </button>
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      await downloadCurrentImage(generatedImage);
+                    }}
+                    className="px-3 py-1 rounded-md bg-white/10 hover:bg-white/20"
+                  >
+                    Download
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Fullscreen modal for generated image */}
+        <AnimatePresence>
+          {isImageModalOpen && generatedImage && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+              onClick={() => setIsImageModalOpen(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                transition={{ type: "spring", stiffness: 120 }}
+                className="relative max-w-5xl max-h-full"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <img src={generatedImage} alt="Generated" className="w-full h-full object-contain rounded-lg shadow-2xl" />
+                <button
+                  className="absolute top-4 right-4 px-3 py-1 rounded-md bg-white/10 hover:bg-white/20 text-white"
+                  onClick={() => setIsImageModalOpen(false)}
+                >
+                  Close
+                </button>
+                <button
+                  onClick={async () => { await downloadCurrentImage(generatedImage); }}
+                  className="absolute top-4 right-20 px-3 py-1 rounded-md bg-white/10 hover:bg-white/20 text-white"
+                >
+                  Download
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </main>
     </div>
   );
 }

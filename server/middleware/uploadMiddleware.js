@@ -7,23 +7,18 @@ const storage = multer.memoryStorage();
 
 // File filter function
 const fileFilter = (req, file, cb) => {
-  // Check file type
-  const filetypes = /jpeg|jpg|png|gif|webp/;
-  const mimetype = filetypes.test(file.mimetype);
-  const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-
-  if (mimetype && extname) {
-    return cb(null, true);
-  }
-  
-  cb(new Error('Error: Images Only! (.png, .jpg, .jpeg, .gif, .webp)'));
+  // Accept any image/* mimetype. Some mobile browsers send application/octet-stream.
+  const mime = (file.mimetype || '').toLowerCase();
+  const isImage = mime.startsWith('image/') || mime === 'application/octet-stream';
+  if (isImage) return cb(null, true);
+  cb(new Error('Error: Images Only!'));
 };
 
 // Configure multer upload
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB max file size
+    fileSize: 20 * 1024 * 1024, // 20MB max file size (mobile photos can be large)
     files: 1 // Maximum 1 file per request
   },
   fileFilter: fileFilter

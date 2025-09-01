@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { apiUrl } from '../utils/api';
 
-const ImageUpload = ({ sendStop, isTextCleared, handleResponse, setRez}) => {
+const ImageUpload = ({ sendStop, isTextCleared, handleResponse, setRez }) => {
   const [file, setFile] = useState(null);
   const [fileURL, setFileURL] = useState(null);
   const [prompt, setPrompt] = useState('');
@@ -9,8 +10,8 @@ const ImageUpload = ({ sendStop, isTextCleared, handleResponse, setRez}) => {
 
   useEffect(() => {
     if (isTextCleared) {
-      setResponse(null); 
-      sendStop(); 
+      setResponse(null);
+      sendStop();
     }
   }, [isTextCleared, sendStop]);
 
@@ -43,7 +44,7 @@ const ImageUpload = ({ sendStop, isTextCleared, handleResponse, setRez}) => {
     setResponse('');
 
     try {
-      const response = await fetch('http://localhost:3001/image/analyze', {
+      const response = await fetch(apiUrl('image/analyze'), {
         method: 'POST',
         body: formData,
       });
@@ -73,7 +74,7 @@ const ImageUpload = ({ sendStop, isTextCleared, handleResponse, setRez}) => {
     showThumb(false);
 
     try {
-      const response = await fetch('http://localhost:3001/image/generate', {
+      const response = await fetch(apiUrl('image/generate'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -109,11 +110,11 @@ const ImageUpload = ({ sendStop, isTextCleared, handleResponse, setRez}) => {
       <button className="button2" onClick={handleImageUpload}>📷</button>
       <input className="button2"
         id="fileInput"
-        type="file" 
+        type="file"
         accept="image/*"
-        capture="environment" 
-        onChange={handleFileChange} 
-        style={{ display: 'none' }} 
+        capture="environment"
+        onChange={handleFileChange}
+        style={{ display: 'none' }}
       />
 
       <input className="button2"
@@ -121,9 +122,9 @@ const ImageUpload = ({ sendStop, isTextCleared, handleResponse, setRez}) => {
         type="file"
         accept="image/*"
         onChange={handleFileChange}
-        style={{ display: 'none' }} 
+        style={{ display: 'none' }}
       />
-      
+
       <label htmlFor="fileInput" style={{
         display: 'inline-block',
         background: 'transparent',
@@ -132,7 +133,7 @@ const ImageUpload = ({ sendStop, isTextCleared, handleResponse, setRez}) => {
         borderRadius: '5px', marginRight: '4px',
         cursor: 'pointer',
       }}>
-      Snap
+        Snap
       </label>
 
       <label htmlFor="fileInput2" style={{
@@ -143,7 +144,7 @@ const ImageUpload = ({ sendStop, isTextCleared, handleResponse, setRez}) => {
         borderRadius: '5px',
         cursor: 'pointer',
       }}>
-      +File
+        +File
       </label>
 
       <br />
@@ -165,27 +166,27 @@ const ImageUpload = ({ sendStop, isTextCleared, handleResponse, setRez}) => {
       />
 
       <button className="button2" onClick={handlePromptSubmit}>🖼️</button>
-      
+
       {fileURL && thumb && (
-        <div style={{ textAlign: 'center', margin: 'auto', width: '100vw', position: 'absolute', top: '18vh'}}>
+        <div style={{ textAlign: 'center', margin: 'auto', width: '100vw', position: 'absolute', top: '18vh' }}>
           <img src={fileURL} onClick={() => { showThumb(!thumb); }} style={{ margin: "auto", height: '30vh', borderRadius: '.8em' }} alt="Uploaded" />
         </div>
       )}
-      
+
       {response && response.type === 'text' && (
         <div style={{ textAlign: 'center', width: '100vw', position: 'absolute', top: thumb ? '50vh' : '40vh', maxHeight: '30vh', overflow: 'auto' }}>
           <p style={{
             color: "rgb(53, 96, 251)",
             overflow: "hidden",
-            overflowY: "auto", 
-            margin: 'auto', 
-            width: "80vw", 
+            overflowY: "auto",
+            margin: 'auto',
+            width: "80vw",
           }}>{response.content}</p>
         </div>
       )}
       {response && response.type === 'image' && !isTextCleared && (
         <button className="button2" onClick={toggleVisibility} style={{ width: "100vw", position: 'absolute', top: 140, alignItems: 'center', background: 'transparent', zIndex: 50000, display: 'flex', justifyContent: 'center' }}>
-          <img ref={imgRef} src={response.content} style={{ width: '50vh', zIndex: 4000, margin: 'auto', borderRadius: '2em'  }} alt="Generated" />
+          <img ref={imgRef} src={response.content} style={{ width: '50vh', zIndex: 4000, margin: 'auto', borderRadius: '2em' }} alt="Generated" />
         </button>
       )}
     </div>

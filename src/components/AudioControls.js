@@ -15,6 +15,13 @@ const AudioControls = ({
   setShowPlayPause,
   setIsPlaying
 }) => {
+  const hasSpeechRecognition = typeof window !== 'undefined' && (
+    window.SpeechRecognition || window.webkitSpeechRecognition
+  );
+  const isTouchDevice = typeof window !== 'undefined' && (
+    'ontouchstart' in window || (navigator && navigator.maxTouchPoints > 0)
+  );
+
   const handleStop = () => {
     sendStop();
     stopSpeakText();
@@ -26,10 +33,10 @@ const AudioControls = ({
 
   return (
     <div className="buttons-container">
-      {windowWidth >= 468 && (
-        <button 
+      {windowWidth >= 468 && hasSpeechRecognition && !isTouchDevice && (
+        <button
           className="button"
-          onClick={() => startRecording()} 
+          onClick={() => startRecording()}
           type="button"
         >
           Start
@@ -45,9 +52,9 @@ const AudioControls = ({
       </button>
 
       {isPlaying && (
-        <button 
+        <button
           className="button"
-          onClick={() => toggleMute()} 
+          onClick={() => toggleMute()}
           type="button"
         >
           Mute
@@ -55,9 +62,9 @@ const AudioControls = ({
       )}
 
       {showPlayPause && (
-        <button 
+        <button
           className="button"
-          onClick={() => pause()} 
+          onClick={() => pause()}
           type="button"
         >
           {isPlaying ? 'Pause' : 'Play'}

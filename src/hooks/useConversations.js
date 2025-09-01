@@ -1,13 +1,43 @@
 import { useState, useEffect } from 'react';
+import { apiUrl } from '../utils/api';
 
 export const useConversations = (apiKey, setRez, handleResponse) => {
   const [conversations, setConversations] = useState([]);
   const [selectedConversationId, setSelectedConversationId] = useState(null);
   const [thisConversation, setThisConversation] = useState(null);
+  const [debugLog, setDebugLog] = useState([]);
+
+  const addDebugLog = (msg) => {
+    const entry = `${new Date().toLocaleTimeString()}: ${msg}`;
+    setDebugLog(prev => [...prev.slice(-19), entry]);
+    console.log('🔥', entry);
+  };
 
   useEffect(() => {
     const storedConversations = JSON.parse(localStorage.getItem('conversations') || '[]');
     setConversations(storedConversations);
+    const storedId = localStorage.getItem('selectedConversationId');
+    if (storedId) {
+      const conv = storedConversations.find(c => c.id === storedId);
+      if (conv) {
+        setSelectedConversationId(storedId);
+        setThisConversation(conv);
+        addDebugLog(`Loaded selected conversation from storage: ${storedId}`);
+      } else {
+        localStorage.removeItem('selectedConversationId');
+      }
+    }
+  }, []);
+
+  // Listen for storage events to refresh conversations
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const storedConversations = JSON.parse(localStorage.getItem('conversations') || '[]');
+      setConversations(storedConversations);
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   useEffect(() => {
@@ -28,76 +58,83 @@ export const useConversations = (apiKey, setRez, handleResponse) => {
     localStorage.setItem('conversations', JSON.stringify(updatedConversations));
     setSelectedConversationId(newConversation.id);
     setThisConversation(newConversation);
-    
+
+    addDebugLog(`Added to conversations list: ${name}, total: ${updatedConversations.length}`);
     return newConversation;
   };
 
   const createAndSelectConversation = async () => {
     const now = new Date();
-    const formattedDate = now.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: 'numeric',
-      hour12: true
-    }).replace(',', '');
-    
+    const formattedDate = now.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) + ' ' + now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+
     const newConversation = {
       id: Date.now().toString(),
-      name: `Conv_${formattedDate}`,
+      name: `Convo ${formattedDate}`,
       history: ''
     };
 
     const updatedConversations = [...conversations, newConversation];
     localStorage.setItem('conversations', JSON.stringify(updatedConversations));
-    
+
     setConversations(updatedConversations);
     setSelectedConversationId(newConversation.id);
     setThisConversation(newConversation);
+    localStorage.setItem('selectedConversationId', newConversation.id);
 
     return newConversation;
   };
 
   // hooks/useConversations.js
-// ... other code remains the same ...
+  // ... other code remains the same ...
 
-const handleGreeting = async (theStuff) => {
+  const handleGreeting = async (theStuff) => {
+    addDebugLog(`handleGreeting called with: ${theStuff}, selectedId: ${selectedConversationId}`);
     try {
-      let currentConversation;
-      
-      if (!selectedConversationId) {
-        currentConversation = await createAndSelectConversation();
-        const storedConversations = JSON.parse(localStorage.getItem('conversations') || '[]');
-        if (!storedConversations.some(conv => conv.id === currentConversation.id)) {
-          storedConversations.push(currentConversation);
-          localStorage.setItem('conversations', JSON.stringify(storedConversations));
-        }
-      } else {
-        currentConversation = conversations.find(
-          conv => conv.id === selectedConversationId
-        );
-        
-        if (!currentConversation) {
-          currentConversation = await createAndSelectConversation();
-        }
-      }
+      let currentConversation = conversations.find(conv => conv.id === selectedConversationId);
 
       if (!currentConversation) {
-        console.error("Failed to create or find conversation");
-        return;
+        // Auto-create if none selected
+        const now = new Date();
+        const date = now.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
+        const time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        const autoName = `Convo ${date} ${time}`;
+        addDebugLog(`Auto-creating conversation: ${autoName}`);
+        currentConversation = {
+          id: Date.now().toString(),
+          name: autoName,
+          history: ''
+        };
+        let updatedConversations = [...conversations, currentConversation];
+        setConversations(updatedConversations);
+        localStorage.setItem('conversations', JSON.stringify(updatedConversations));
+        localStorage.setItem('selectedConversationId', currentConversation.id);
+        setSelectedConversationId(currentConversation.id);
+        setThisConversation(currentConversation);
+        addDebugLog(`Created and selected conversation: ${currentConversation.id}`);
       }
 
-      const existingHistory = currentConversation.history || '';
-      const newMessage = existingHistory 
-        ? `${existingHistory} Question: ${theStuff}`
-        : `Question: ${theStuff}`;
+      // Append question locally (timestamps are NOT stored in history)
+      let updatedHistory = currentConversation.history ? `${currentConversation.history} Question: ${theStuff}` : `Question: ${theStuff}`;
+      let updatedConversation = { ...currentConversation, history: updatedHistory };
 
+      // Send request with a CURRENT timestamp used ONLY for model reasoning (not persisted)
+      const currentIsoTimestamp = new Date().toISOString();
+      const instruction = [
+        'Text before this sentence is conversation history so far between you and me.',
+        'The following ISO-8601 timestamp is the ACTUAL current date/time and should be treated as ground truth for any time-sensitive reasoning:',
+        `TIMESTAMP: ${currentIsoTimestamp}`,
+        'Do NOT include the timestamp in your response or repeat it back. Use it only for context.',
+        'If the user asks for current information or a web search, use the available functions to fetch up-to-date data, then summarize clearly.',
+        'Keep responses concise and suitable for text-to-speech.'
+      ].join(' ');
+
+      // Important: timestamps are NOT added to updatedHistory, only into the instruction sent to the model
       const payload = {
-        text: `${newMessage} <-- Text before this sentence is conversation history so far between you and me. Do NOT include timestamps in responses, timestamps provide context for when this conversation is taking place. responses will be spoken back to user using TTS. Using this information and context, answer the following question, calling functions if asked current information -->  "${theStuff}"`,
+        text: `${updatedHistory} <-- ${instruction} -->  "${theStuff}"`,
         code: apiKey,
       };
 
-      const response = await fetch("http://localhost:3001/chat/greeting", {
+      const response = await fetch(apiUrl('chat/greeting'), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -108,30 +145,26 @@ const handleGreeting = async (theStuff) => {
       if (response.ok) {
         const responseData = await response.json();
         const reply = responseData.reply;
-        
-        // Update the UI text
-        setRez(reply);
-        
-        // Speak the response
-        handleResponse(reply);
 
-        const newUpdatedHistory = `${newMessage} Response: ${reply}`;
-        const updatedConversation = {
-          ...currentConversation,
-          history: newUpdatedHistory
-        };
+        // Append response locally
+        updatedHistory = `${updatedHistory} Response: ${reply}`;
+        updatedConversation = { ...updatedConversation, history: updatedHistory };
 
-        const latestStoredConversations = JSON.parse(localStorage.getItem('conversations') || '[]');
-        const finalUpdatedConversations = latestStoredConversations.map(conv => 
-          conv.id === updatedConversation.id ? updatedConversation : conv
-        );
-
-        localStorage.setItem('conversations', JSON.stringify(finalUpdatedConversations));
-        setConversations(finalUpdatedConversations);
+        // Update state and storage once with both question and response
+        let updatedConversations = conversations.map(c => c.id === updatedConversation.id ? updatedConversation : c);
+        if (!conversations.some(c => c.id === updatedConversation.id)) {
+          updatedConversations = [...conversations, updatedConversation];
+        }
+        setConversations(updatedConversations);
+        localStorage.setItem('conversations', JSON.stringify(updatedConversations));
         setThisConversation(updatedConversation);
-        setSelectedConversationId(updatedConversation.id);
+
+        // Update UI
+        setRez(reply);
+        handleResponse(reply);
       }
     } catch (error) {
+      addDebugLog(`Error in handleGreeting: ${error.message}`);
       console.error("Error -->", error);
     }
   };
@@ -139,6 +172,45 @@ const handleGreeting = async (theStuff) => {
   const handleSelectConversation = (conversationId, conversationObject) => {
     setSelectedConversationId(conversationId);
     setThisConversation(conversationObject);
+    localStorage.setItem('selectedConversationId', conversationId);
+    addDebugLog(`Selected conversation: ${conversationId}`);
+  };
+
+  // Remove the fallback creation from appendResponseToHistory and appendQuestionToHistory, assume conversation exists
+  const appendResponseToHistory = (responseText) => {
+    if (!selectedConversationId) {
+      addDebugLog('No conversation selected for append response');
+      return;
+    }
+    const selectedConversation = conversations.find(conv => conv.id === selectedConversationId);
+    if (!selectedConversation) {
+      addDebugLog('Selected conversation not found for append response');
+      return;
+    }
+    const newHistory = `${selectedConversation.history} Response: ${responseText}`;
+    const updatedConversation = { ...selectedConversation, history: newHistory };
+    const updatedConversations = conversations.map(conv => conv.id === selectedConversationId ? updatedConversation : conv);
+    setConversations(updatedConversations);
+    localStorage.setItem('conversations', JSON.stringify(updatedConversations));
+    setThisConversation(updatedConversation);
+  };
+
+  const appendQuestionToHistory = (questionText) => {
+    if (!selectedConversationId) {
+      addDebugLog('No conversation selected for append question');
+      return;
+    }
+    const selectedConversation = conversations.find(conv => conv.id === selectedConversationId);
+    if (!selectedConversation) {
+      addDebugLog('Selected conversation not found for append question');
+      return;
+    }
+    const newHistory = selectedConversation.history ? `${selectedConversation.history} Question: ${questionText}` : `Question: ${questionText}`;
+    const updatedConversation = { ...selectedConversation, history: newHistory };
+    const updatedConversations = conversations.map(conv => conv.id === selectedConversationId ? updatedConversation : conv);
+    setConversations(updatedConversations);
+    localStorage.setItem('conversations', JSON.stringify(updatedConversations));
+    setThisConversation(updatedConversation);
   };
 
   const handleRenameConversation = (conversationId) => {
@@ -170,7 +242,11 @@ const handleGreeting = async (theStuff) => {
     );
     setConversations(updatedConversations);
     localStorage.setItem('conversations', JSON.stringify(updatedConversations));
-    setSelectedConversationId(null);
+    if (selectedConversationId === conversationId) {
+      setSelectedConversationId(null);
+      setThisConversation(null);
+      localStorage.removeItem('selectedConversationId');
+    }
   };
 
   const clearConversationHistory = () => {
@@ -201,10 +277,13 @@ const handleGreeting = async (theStuff) => {
       console.log('Nothing to export.');
       return;
     }
-    const conversationBlob = new Blob(
-      [conversationHistory],
-      { type: 'text/plain;charset=utf-8' }
-    );
+    const conversationBlob = new Blob([
+      // Ensure Questions and Responses are on new lines for readability
+      String(conversationHistory)
+        .replace(/\s*Question:\s*/g, '\nQuestion: ')
+        .replace(/\s*Response:\s*/g, '\nResponse: ')
+        .trim()
+    ], { type: 'text/plain;charset=utf-8' });
     const blobUrl = URL.createObjectURL(conversationBlob);
     const tempLink = document.createElement('a');
     tempLink.href = blobUrl;
@@ -229,6 +308,9 @@ const handleGreeting = async (theStuff) => {
     handleGreeting,
     createAndSelectConversation,
     downloadConvo,
-    setThisConversation
+    setThisConversation,
+    appendResponseToHistory,
+    appendQuestionToHistory,
+    debugLog
   };
 };

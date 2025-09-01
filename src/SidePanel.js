@@ -1,18 +1,18 @@
 import React, { useState } from 'react';
 
-const SidePanel = ({ 
-  onSelectConversation, 
-  onAddConversation, 
-  onRenameConversation, 
-  onDeleteConversation, 
-  selectedConversationId, 
+const SidePanel = ({
+  onSelectConversation,
+  onAddConversation,
+  onRenameConversation,
+  onDeleteConversation,
+  selectedConversationId,
   setThisConversation,
-  conversations = [] 
+  conversations = []
 }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const togglePanel = (e) => {
-    e.stopPropagation(); 
+    e.stopPropagation();
     setIsOpen(!isOpen);
   };
 
@@ -22,7 +22,7 @@ const SidePanel = ({
   };
 
   const handleAddConversation = (e) => {
-    e.stopPropagation(); 
+    e.stopPropagation();
     const conversationName = prompt('Enter a name for the new conversation');
     if (conversationName) {
       onAddConversation(conversationName);
@@ -30,18 +30,13 @@ const SidePanel = ({
   };
 
   const handleRenameConversation = (e, conversationId) => {
-    e.stopPropagation(); 
-    const selectedConversation = conversations.find(conversation => conversation.id === conversationId);
-    if (selectedConversation) {
-      const newConversationName = prompt('Enter a new name for the conversation', selectedConversation.name);
-      if (newConversationName) {
-        onRenameConversation(conversationId, newConversationName);
-      }
-    }
+    e.stopPropagation();
+    // Defer prompting to the hook to avoid duplicate dialogs
+    onRenameConversation(conversationId);
   };
 
   const handleDeleteConversation = (e, conversationId) => {
-    e.stopPropagation(); 
+    e.stopPropagation();
     const confirmDelete = window.confirm('Are you sure you want to delete this conversation?');
     if (confirmDelete) {
       onDeleteConversation(conversationId);
@@ -50,29 +45,29 @@ const SidePanel = ({
 
   return (
     <div className="hamburger-menu" style={{ position: 'absolute', top: '0px', left: '0px' }}>
-      <div 
-        style={{fontSize: '2.5rem', marginLeft: '14px', marginTop: '7px', zIndex: '1001', cursor: 'pointer'}} 
+      <div
+        style={{ fontSize: '2.5rem', marginLeft: '14px', marginTop: '7px', zIndex: '1001', cursor: 'pointer' }}
         onClick={togglePanel}
       >
         ☰
       </div>
       <div className={`side-panel ${isOpen ? 'open' : ''}`}>
-        <div 
-          style={{fontSize: '2.5rem', zIndex: '1001', position: 'absolute', top: '7px', marginLeft: '14px', cursor: 'pointer'}}
+        <div
+          style={{ fontSize: '2.5rem', zIndex: '1001', position: 'absolute', top: '7px', marginLeft: '14px', cursor: 'pointer' }}
           onClick={togglePanel}
         >
           ☰
         </div>
-        
-        <div style={{marginTop: "20px"}}>cHatZ</div>
+
+        <div style={{ marginTop: "20px" }}>cHatZ</div>
         {isOpen && (
           <div className="panel-content">
             <button className="add-conversation" onClick={handleAddConversation}>
               +
             </button>
             {conversations.map((conversation) => (
-              <div 
-                key={conversation.id}  
+              <div
+                key={conversation.id}
                 className={`conversation-item ${conversation.id === selectedConversationId ? 'selected-conversation' : ''}`}
                 onClick={(e) => {
                   e.stopPropagation();
