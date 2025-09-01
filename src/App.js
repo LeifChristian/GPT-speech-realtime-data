@@ -194,19 +194,23 @@ function App() {
   // Render URLs as clickable links that open in a new tab
   const renderTextWithLinks = (text) => {
     const urlRegex = /(https?:\/\/[^\s]+)/g;
-    return String(text || '').split(urlRegex).map((part, idx) => {
+    return String(text || '').split(urlRegex).flatMap((part, idx) => {
       if (urlRegex.test(part)) {
-        return (
+        // Strip trailing punctuation from the matched URL but render it after the link
+        const cleaned = part.replace(/[)\]\}>,.:;!?]+$/g, '');
+        const trailing = part.slice(cleaned.length);
+        return [
           <a
             key={`lnk-${idx}`}
-            href={part}
+            href={cleaned}
             target="_blank"
             rel="noopener noreferrer"
             className="text-blue-400 hover:text-blue-300 underline"
           >
-            {part}
-          </a>
-        );
+            {cleaned}
+          </a>,
+          trailing ? <span key={`punct-${idx}`}>{trailing}</span> : null,
+        ];
       }
       return <span key={`txt-${idx}`}>{part}</span>;
     });
