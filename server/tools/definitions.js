@@ -35,7 +35,7 @@ const TOOL_DEFINITIONS = [
   {
     name: 'get_realtime_data',
     description:
-      'Get current data and or info about anything more recent than September 2023. Use this if user ever asks for a web search. Summarize for spoken delivery; omit the word snippet.',
+      'Web search for current/recent info (after Sep 2023). Use when the user asks for a web search, latest news online, or anything needing live internet results. Prefer over get_news for general web search.',
     parameters: {
       type: 'object',
       properties: {

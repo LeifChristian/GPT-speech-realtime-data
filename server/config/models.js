@@ -11,7 +11,10 @@ const MODEL_CATALOG = {
     { provider: 'openai', model: 'gpt-4o-mini', label: 'GPT-4o Mini', supportsTools: true },
     { provider: 'openai', model: 'gpt-4o', label: 'GPT-4o', supportsTools: true },
     { provider: 'openai', model: 'gpt-4.1-mini', label: 'GPT-4.1 Mini', supportsTools: true },
-    { provider: 'openai', model: 'gpt-4.1', label: 'GPT-4.1', supportsTools: true },
+    { provider: 'openai', model: 'gpt-4.1', label: 'GPT-4.1', supportsTools: true, api: 'chat' },
+    { provider: 'openai', model: 'gpt-5', label: 'GPT-5', supportsTools: true, api: 'responses' },
+    { provider: 'openai', model: 'gpt-5-mini', label: 'GPT-5 Mini', supportsTools: true, api: 'responses' },
+    { provider: 'openai', model: 'gpt-5-nano', label: 'GPT-5 Nano', supportsTools: true, api: 'responses' },
     { provider: 'anthropic', model: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4', supportsTools: true },
     { provider: 'anthropic', model: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku', supportsTools: true },
     { provider: 'xai', model: 'grok-3-mini', label: 'Grok 3 Mini', supportsTools: true },
@@ -175,4 +178,5 @@ module.exports = {
   slotKey,
   parseSlotKey,
   getConfiguredProviders,
+  findCatalogEntry,
 };

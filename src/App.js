@@ -313,6 +313,7 @@ function App() {
             stopVoiceMode={stopVoiceMode}
             skipSpeechAndListen={skipSpeechAndListen}
             isPlaying={isPlaying}
+            showPlayPause={showPlayPause}
           />
         )}
       </AnimatePresence>

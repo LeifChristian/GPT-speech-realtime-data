@@ -61,12 +61,12 @@ const AudioControls = ({
           Stop
         </button>
 
-        {voiceModeActive && (voiceStatus === 'speaking' || isPlaying) && (
+        {showPlayPause && (isPlaying || voiceStatus === 'speaking') && (
           <button
             className="button"
             onClick={() => skipSpeechAndListen?.()}
             type="button"
-            title="Skip speech and start listening"
+            title={voiceModeActive ? 'Skip speech and start listening' : 'Skip speech'}
           >
             FFwd
           </button>
