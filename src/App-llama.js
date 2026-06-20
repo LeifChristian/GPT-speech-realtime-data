@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { apiUrl } from "./utils/api";
 import "./App.css";
 
 const PWD = 8675309;
@@ -132,7 +133,7 @@ function App() {
       ? `${updatedHistory} <-- Text before this sentence is conversation history so far between you and me. Do NOT include timestamps in responses, timestamps provide context for when this conversation is taking place. responses will be spoken back to user using TTS. Using this information and context, answer the following question -->  "${userInput}"`
       : userInput;
     try {
-      const response = await fetch('http://localhost:3001/score', {
+      const response = await fetch(apiUrl('score'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

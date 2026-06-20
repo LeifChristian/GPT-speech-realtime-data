@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import PropTypes from 'prop-types';
+import { apiUrl } from '../utils/api';
 
 const UnifiedInput = ({
     enteredText,
@@ -36,7 +37,7 @@ const UnifiedInput = ({
     // Classify prompt using our new endpoint
     const classifyPrompt = async (prompt) => {
         try {
-            const response = await fetch('http://localhost:3001/chat/classify', {
+            const response = await fetch(apiUrl('chat/classify'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -59,7 +60,7 @@ const UnifiedInput = ({
     // Handle image generation
     const handleImageGeneration = async (prompt) => {
         try {
-            const response = await fetch('http://localhost:3001/image/generate', {
+            const response = await fetch(apiUrl('image/generate'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -93,7 +94,7 @@ const UnifiedInput = ({
         formData.append('stuff', prompt || 'What is in this image?');
 
         try {
-            const response = await fetch('http://localhost:3001/image/analyze', {
+            const response = await fetch(apiUrl('image/analyze'), {
                 method: 'POST',
                 body: formData,
             });

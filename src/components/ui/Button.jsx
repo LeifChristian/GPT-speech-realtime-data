@@ -9,6 +9,9 @@ const Button = React.forwardRef(({
     asChild = false,
     children,
     disabled,
+    onClick,
+    onTouchEnd,
+    type = 'button',
     ...props
 }, ref) => {
     const variants = {
@@ -45,6 +48,10 @@ const Button = React.forwardRef(({
             className={classes}
             ref={ref}
             disabled={disabled}
+            type={type}
+            onClick={onClick}
+            onTouchEnd={onTouchEnd || ((e) => { if (onClick) { e.preventDefault(); onClick(e); } })}
+            style={{ touchAction: 'manipulation' }}
             whileHover={{ scale: disabled ? 1 : 1.02 }}
             whileTap={{ scale: disabled ? 1 : 0.98 }}
             transition={{ duration: 0.1 }}

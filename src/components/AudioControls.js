@@ -15,6 +15,14 @@ const AudioControls = ({
   setShowPlayPause,
   setIsPlaying
 }) => {
+  const hasSpeechRecognition = typeof window !== 'undefined' && (
+    window.SpeechRecognition || window.webkitSpeechRecognition
+  );
+  // Hide voice input on mobile viewports only; touch detection is unreliable on desktop
+  // (many laptops report maxTouchPoints > 0 even without a touchscreen).
+  const MOBILE_BREAKPOINT = 768;
+  const showStartButton = windowWidth >= MOBILE_BREAKPOINT && hasSpeechRecognition;
+
   const handleStop = () => {
     sendStop();
     stopSpeakText();
@@ -26,10 +34,10 @@ const AudioControls = ({
 
   return (
     <div className="buttons-container">
-      {windowWidth >= 468 && (
-        <button 
+      {showStartButton && (
+        <button
           className="button"
-          onClick={() => startRecording()} 
+          onClick={() => startRecording()}
           type="button"
         >
           Start
@@ -45,9 +53,9 @@ const AudioControls = ({
       </button>
 
       {isPlaying && (
-        <button 
+        <button
           className="button"
-          onClick={() => toggleMute()} 
+          onClick={() => toggleMute()}
           type="button"
         >
           Mute
@@ -55,9 +63,9 @@ const AudioControls = ({
       )}
 
       {showPlayPause && (
-        <button 
+        <button
           className="button"
-          onClick={() => pause()} 
+          onClick={() => pause()}
           type="button"
         >
           {isPlaying ? 'Pause' : 'Play'}
