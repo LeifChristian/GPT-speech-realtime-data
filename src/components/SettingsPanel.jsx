@@ -11,7 +11,8 @@ function slotValue(slot) {
 
 function formatOptionLabel(option) {
   const provider = option.provider.charAt(0).toUpperCase() + option.provider.slice(1);
-  return `${option.label} (${provider})`;
+  const apiHint = option.api === 'responses' ? ' · Responses' : '';
+  return `${option.label} (${provider})${apiHint}`;
 }
 
 function getSlotLabel(config, key) {

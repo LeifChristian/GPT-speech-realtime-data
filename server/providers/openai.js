@@ -1,10 +1,16 @@
 const { OpenAI } = require('openai');
 const { TOOL_DEFINITIONS } = require('../tools/definitions');
+const { findCatalogEntry } = require('../config/models');
 
 function getOpenAIClient() {
   const apiKey = process.env.OPENAI_API_KEY || process.env.openAPIKey;
   if (!apiKey) return null;
   return new OpenAI({ apiKey });
+}
+
+function usesResponsesApi(model) {
+  const entry = findCatalogEntry('text', 'openai', model);
+  return entry?.api === 'responses';
 }
 
 function toOpenAITools(tools) {
@@ -15,6 +21,16 @@ function toOpenAITools(tools) {
       description: tool.description,
       parameters: tool.parameters,
     },
+  }));
+}
+
+function toResponsesTools(tools) {
+  return tools.map((tool) => ({
+    type: 'function',
+    name: tool.name,
+    description: tool.description,
+    parameters: tool.parameters,
+    strict: false,
   }));
 }
 
@@ -52,6 +68,41 @@ function toOpenAIMessages(messages, system) {
   return out;
 }
 
+function buildResponsesInput(messages) {
+  const input = [];
+
+  for (const msg of messages) {
+    if (msg.role === 'user') {
+      input.push({ role: 'user', content: msg.content });
+      continue;
+    }
+
+    if (msg.role === 'assistant') {
+      if (msg.responsesOutput?.length) {
+        input.push(...msg.responsesOutput);
+        continue;
+      }
+      if (msg.content) {
+        input.push({
+          role: 'assistant',
+          content: [{ type: 'output_text', text: msg.content }],
+        });
+      }
+      continue;
+    }
+
+    if (msg.role === 'tool') {
+      input.push({
+        type: 'function_call_output',
+        call_id: msg.toolCallId,
+        output: msg.content,
+      });
+    }
+  }
+
+  return input;
+}
+
 function parseOpenAIResponse(message) {
   const toolCalls = (message.tool_calls || []).map((tc) => ({
     id: tc.id,
@@ -70,9 +121,60 @@ function parseOpenAIResponse(message) {
   };
 }
 
+function parseResponsesOutput(response) {
+  const output = response.output || [];
+  const functionCalls = output.filter((item) => item.type === 'function_call');
+  const text = response.output_text || null;
+
+  const toolCalls = functionCalls.map((call) => ({
+    id: call.call_id,
+    name: call.name,
+    arguments: JSON.parse(call.arguments || '{}'),
+  }));
+
+  return {
+    text,
+    toolCalls,
+    assistantMessage: {
+      role: 'assistant',
+      content: text || '',
+      toolCalls,
+      responsesOutput: output,
+    },
+  };
+}
+
+async function completeViaResponses({
+  client,
+  model,
+  messages,
+  system,
+  tools = TOOL_DEFINITIONS,
+  maxTokens,
+}) {
+  const payload = {
+    model,
+    instructions: system || undefined,
+    input: buildResponsesInput(messages),
+    tools: toResponsesTools(tools),
+    tool_choice: 'auto',
+    store: false,
+  };
+  if (maxTokens !== undefined) payload.max_output_tokens = maxTokens;
+
+  const response = await client.responses.create(payload);
+  return parseResponsesOutput(response);
+}
+
 async function complete({ model, messages, system, tools = TOOL_DEFINITIONS, temperature, maxTokens }) {
   const client = getOpenAIClient();
   if (!client) throw new Error('OpenAI API key is not configured');
+
+  if (usesResponsesApi(model)) {
+    console.log(`[OPENAI] Responses API complete model=${model}`);
+    return completeViaResponses({ client, model, messages, system, tools, maxTokens });
+  }
+
   const payload = {
     model,
     messages: toOpenAIMessages(messages, system),
@@ -90,6 +192,29 @@ async function complete({ model, messages, system, tools = TOOL_DEFINITIONS, tem
 async function completeSimple({ model, messages, system, temperature, maxTokens }) {
   const client = getOpenAIClient();
   if (!client) throw new Error('OpenAI API key is not configured');
+
+  if (usesResponsesApi(model)) {
+    console.log(`[OPENAI] Responses API simple model=${model}`);
+    const response = await client.responses.create({
+      model,
+      instructions: system || undefined,
+      input: buildResponsesInput(messages),
+      max_output_tokens: maxTokens,
+      store: false,
+    });
+
+    const text = response.output_text || '';
+    return {
+      text,
+      toolCalls: [],
+      assistantMessage: {
+        role: 'assistant',
+        content: text,
+        toolCalls: [],
+      },
+    };
+  }
+
   const payload = {
     model,
     messages: toOpenAIMessages(messages, system),
@@ -137,4 +262,5 @@ module.exports = {
   completeSimple,
   analyzeImage,
   getOpenAIClient,
+  usesResponsesApi,
 };
