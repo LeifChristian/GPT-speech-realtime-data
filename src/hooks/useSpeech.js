@@ -3,6 +3,7 @@ import { useMicAnalyser } from './useMicAnalyser';
 
 const RELISTEN_DELAY_MS = 750;
 const SKIP_TO_LISTEN_DELAY_MS = 200;
+const VOICE_INACTIVITY_MS = 3 * 60 * 1000;
 
 export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
   const [isRecording, setIsRecording] = useState(false);
@@ -22,6 +23,9 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
   const relistenTimerRef = useRef(null);
   const handleGreetingRef = useRef(handleGreeting);
   const speechSessionRef = useRef(0);
+  const inactivityTimerRef = useRef(null);
+  const stopVoiceModeRef = useRef(() => {});
+  const resetInactivityTimerRef = useRef(() => {});
 
   const { frequencyData, isMicActive, startMic, stopMic } = useMicAnalyser();
 
@@ -35,6 +39,29 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
       relistenTimerRef.current = null;
     }
   }, []);
+
+  const clearInactivityTimer = useCallback(() => {
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+      inactivityTimerRef.current = null;
+    }
+  }, []);
+
+  /** Ends voice mode after 3 minutes with no user speech or skip action */
+  const resetInactivityTimer = useCallback(() => {
+    clearInactivityTimer();
+    if (!voiceModeRef.current) return;
+    inactivityTimerRef.current = setTimeout(() => {
+      inactivityTimerRef.current = null;
+      if (voiceModeRef.current) {
+        stopVoiceModeRef.current();
+      }
+    }, VOICE_INACTIVITY_MS);
+  }, [clearInactivityTimer]);
+
+  useEffect(() => {
+    resetInactivityTimerRef.current = resetInactivityTimer;
+  }, [resetInactivityTimer]);
 
   const startListeningInternal = useCallback(() => {
     const rec = recognitionRef.current;
@@ -108,6 +135,8 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
           const transcript = result[0].transcript.trim();
           if (!transcript) continue;
 
+          resetInactivityTimerRef.current();
+
           setFinalTranscript(transcript);
           setEnteredText(transcript);
           setInterimTranscript('');
@@ -135,6 +164,9 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
         } else {
           interim += result[0].transcript;
           setInterimTranscript(interim);
+          if (interim.trim()) {
+            resetInactivityTimerRef.current();
+          }
         }
       }
     };
@@ -192,13 +224,18 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
     isProcessingRef.current = false;
     setIsProcessing(false);
     clearRelistenTimer();
+    clearInactivityTimer();
     stopListeningInternal();
     stopMic();
     cancelActiveSpeech();
     setIsPlaying(false);
     setShowPlayPause(false);
     setInterimTranscript('');
-  }, [clearRelistenTimer, stopListeningInternal, stopMic, cancelActiveSpeech]);
+  }, [clearRelistenTimer, clearInactivityTimer, stopListeningInternal, stopMic, cancelActiveSpeech]);
+
+  useEffect(() => {
+    stopVoiceModeRef.current = stopVoiceMode;
+  }, [stopVoiceMode]);
 
   const startVoiceMode = useCallback(async () => {
     if (!recognitionRef.current) {
@@ -216,8 +253,9 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
 
     voiceModeRef.current = true;
     setVoiceModeActive(true);
+    resetInactivityTimer();
     startListeningInternal();
-  }, [startMic, startListeningInternal, cancelActiveSpeech]);
+  }, [startMic, startListeningInternal, cancelActiveSpeech, resetInactivityTimer]);
 
   const toggleVoiceMode = useCallback(() => {
     if (voiceModeRef.current) {
@@ -390,12 +428,13 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
     if (!voiceModeRef.current || isProcessingRef.current) return;
     clearRelistenTimer();
     cancelActiveSpeech();
+    resetInactivityTimer();
     awaitingTtsRef.current = false;
     setIsPlaying(false);
     setShowPlayPause(false);
     setVoiceStatus('listening');
     scheduleRelisten(SKIP_TO_LISTEN_DELAY_MS);
-  }, [clearRelistenTimer, scheduleRelisten, cancelActiveSpeech]);
+  }, [clearRelistenTimer, scheduleRelisten, cancelActiveSpeech, resetInactivityTimer]);
 
   const toggleMute = useCallback(() => {
     setToggle((prev) => !prev);
@@ -422,6 +461,7 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
   useEffect(() => {
     return () => {
       clearRelistenTimer();
+      clearInactivityTimer();
       voiceModeRef.current = false;
       if (recognitionRef.current) {
         try {
@@ -434,7 +474,7 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
         window.speechSynthesis.cancel();
       }
     };
-  }, [clearRelistenTimer]);
+  }, [clearRelistenTimer, clearInactivityTimer]);
 
   return {
     isRecording,
