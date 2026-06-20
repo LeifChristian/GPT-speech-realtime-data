@@ -68,6 +68,11 @@ function toOpenAIMessages(messages, system) {
   return out;
 }
 
+function filterResponsesOutputForReplay(output = []) {
+  // Reasoning items (rs_*) cannot be replayed when store=false
+  return output.filter((item) => item.type !== 'reasoning');
+}
+
 function buildResponsesInput(messages) {
   const input = [];
 
@@ -79,7 +84,7 @@ function buildResponsesInput(messages) {
 
     if (msg.role === 'assistant') {
       if (msg.responsesOutput?.length) {
-        input.push(...msg.responsesOutput);
+        input.push(...filterResponsesOutputForReplay(msg.responsesOutput));
         continue;
       }
       if (msg.content) {
@@ -139,7 +144,7 @@ function parseResponsesOutput(response) {
       role: 'assistant',
       content: text || '',
       toolCalls,
-      responsesOutput: output,
+      responsesOutput: filterResponsesOutputForReplay(output),
     },
   };
 }

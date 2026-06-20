@@ -25,6 +25,7 @@ const ModernConversationOverlay = ({
     stopVoiceMode,
     skipSpeechAndListen,
     isPlaying = false,
+    showPlayPause = false,
 }) => {
     // Local input state (must be declared before any conditional returns)
     const [inputText, setInputText] = useState('');
@@ -426,15 +427,15 @@ const ModernConversationOverlay = ({
                                 )}
                             </div>
                             <div className="flex items-center gap-2">
-                            {voiceModeActive && (voiceStatus === 'speaking' || isPlaying) && (
+                            {showPlayPause && (isPlaying || voiceStatus === 'speaking') && (
                                 <Button
                                     type="button"
                                     variant="ghost"
                                     size="icon"
                                     className="text-white hover:bg-white/10"
                                     onClick={() => skipSpeechAndListen?.()}
-                                    title="Skip speech and start listening"
-                                    aria-label="Fast forward to listening"
+                                    title={voiceModeActive ? 'Skip speech and start listening' : 'Skip speech'}
+                                    aria-label={voiceModeActive ? 'Fast forward to listening' : 'Skip speech'}
                                 >
                                     <FastForward className="h-5 w-5" />
                                 </Button>

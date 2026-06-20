@@ -667,17 +667,22 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
     }
   }, [scheduleRelisten, cancelActiveSpeech]);
 
-  /** End TTS immediately and resume listening — stays in voice mode */
+  /** End TTS immediately; in voice mode resume listening */
   const skipSpeechAndListen = useCallback(() => {
-    if (!voiceModeRef.current || isProcessingRef.current) return;
+    if (isProcessingRef.current) return;
     clearRelistenTimer();
     cancelActiveSpeech();
-    resetInactivityTimer();
     awaitingTtsRef.current = false;
     setIsPlaying(false);
     setShowPlayPause(false);
-    setVoiceStatus('listening');
-    scheduleRelisten(SKIP_TO_LISTEN_DELAY_MS);
+
+    if (voiceModeRef.current) {
+      resetInactivityTimer();
+      setVoiceStatus('listening');
+      scheduleRelisten(SKIP_TO_LISTEN_DELAY_MS);
+    } else {
+      setVoiceStatus('idle');
+    }
   }, [clearRelistenTimer, scheduleRelisten, cancelActiveSpeech, resetInactivityTimer]);
 
   const toggleMute = useCallback(() => {
