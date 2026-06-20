@@ -8,6 +8,7 @@ const {
   validateUpload
 } = require('../middleware/uploadMiddleware');
 const axios = require('axios');
+const { analyzeImage } = require('../providers');
 const { imageResultToContent, buildImageGenerateParams } = require('../utils/imageResponse');
 
 // Lightweight request logging for image routes (helps debug mobile issues on DO)
@@ -47,27 +48,17 @@ router.post('/analyze',
         console.error(`[IMG][${req._rid}] Missing mimetype on upload`);
         return res.status(400).json({ error: 'Unknown MIME type', message: 'File has no mimetype' });
       }
+      const { provider, model } = req.app.locals.runtime.vision;
       const base64Image = file.buffer.toString('base64');
-      const model = (req.app.locals.models && req.app.locals.models.visionModel) || process.env.OPENAI_VISION_MODEL || 'gpt-4o';
-      const response = await req.app.locals.openai.chat.completions.create({
-        model: model,
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: stuff || "What is in this image?" },
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:image/${file.mimetype.split('/')[1]};base64,${base64Image}`,
-                },
-              },
-            ],
-          },
-        ],
+      const content = await analyzeImage({
+        provider,
+        model,
+        prompt: stuff || 'What is in this image?',
+        base64Data: base64Image,
+        mimeType: file.mimetype,
       });
-      console.log(`[IMG][${req._rid}] OpenAI vision OK len=${(response.choices[0].message.content || '').length}`)
-      res.json({ type: 'text', content: response.choices[0].message.content });
+      console.log(`[IMG][${req._rid}] vision OK provider=${provider} model=${model} len=${(content || '').length}`);
+      res.json({ type: 'text', content });
     } catch (error) {
       const status = error.response?.status;
       const data = error.response?.data;
@@ -85,9 +76,18 @@ router.post('/generate', async (req, res) => {
   }
 
   try {
-    const model = (req.app.locals.models && req.app.locals.models.imageModel) || process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1';
+    const { provider, model } = req.app.locals.runtime.image;
+    if (provider !== 'openai') {
+      return res.status(400).json({
+        error: 'Unsupported image provider',
+        message: 'Image generation currently requires an OpenAI image model',
+      });
+    }
+    if (!req.app.locals.openai) {
+      return res.status(503).json({ error: 'OpenAI API key required for image generation' });
+    }
     const params = buildImageGenerateParams(model, prompt);
-    console.log(`[IMG][${req._rid}] generate model=${model}`);
+    console.log(`[IMG][${req._rid}] generate provider=${provider} model=${model}`);
     const response = await req.app.locals.openai.images.generate(params);
     const imageContent = imageResultToContent(response);
     console.log(`[IMG][${req._rid}] Image generated format=${imageContent.startsWith('data:') ? 'base64' : 'url'}`);

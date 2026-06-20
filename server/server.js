@@ -3,7 +3,6 @@ const fs = require('fs');
 require('dotenv').config();
 const cors = require('cors');
 const multer = require('multer');
-const { OpenAI } = require('openai');
 const bodyParser = require('body-parser');
 const path = require('path');
 
@@ -12,16 +11,15 @@ const imageRouter = require('./routes/imageRoutes');
 const chatRouter = require('./routes/chatRoutes');
 const fileRouter = require('./routes/fileRoutes');
 const modelRouter = require('./routes/modelRoutes');
-const { getDefaultModels } = require('./config/models');
+const { getDefaultRuntime } = require('./config/models');
+const { getOpenAIClient } = require('./providers/openai');
 
 // Initialize express app
 const app = express();
 
-// OpenAI configuration (supports OPENAI_API_KEY or legacy openAPIKey)
-const openai = new OpenAI({ apiKey: process.env.openAPIKey || process.env.OPENAI_API_KEY });
-
-// Default model configuration via env vars, with sensible fallbacks
-const DEFAULT_MODELS = getDefaultModels();
+// OpenAI client for image generation (OpenAI-only capability for now)
+const openai = getOpenAIClient();
+const DEFAULT_RUNTIME = getDefaultRuntime();
 
 // Multer configuration for file uploads
 const storage = multer.memoryStorage();
@@ -42,8 +40,8 @@ app.locals.openai = openai;
 // Make upload middleware available to routes
 app.locals.upload = upload;
 
-// Runtime model selection (defaults from env; frontend can change via POST /models)
-app.locals.models = { ...DEFAULT_MODELS };
+// Runtime config (models + personality); frontend updates via POST /models
+app.locals.runtime = { ...DEFAULT_RUNTIME };
 
 // Mount routes
 app.use('/models', modelRouter);

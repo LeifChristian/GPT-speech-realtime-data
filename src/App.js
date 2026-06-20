@@ -30,7 +30,7 @@ function App() {
   const [currentConversationName, setCurrentConversationName] = useState('');
   const [isImageSidebarOpen, setIsImageSidebarOpen] = useState(false);
   const responseRef = useRef(null);
-  const { models, loading: modelsLoading, saving: modelsSaving, error: modelsError, updateModels } = useModels();
+  const { config, loading: modelsLoading, saving: modelsSaving, error: modelsError, updateModels } = useModels();
 
   // Speech controls are initialized after we get handleGreeting from conversations
 
@@ -235,7 +235,7 @@ function App() {
       <div className="absolute inset-0 bg-gradient-to-br from-gray-900/30 via-gray-800/40 to-black/60 pointer-events-none" />
 
       <ModelSelector
-        models={models}
+        config={config}
         loading={modelsLoading}
         saving={modelsSaving}
         error={modelsError}
