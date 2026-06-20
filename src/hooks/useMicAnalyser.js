@@ -55,6 +55,10 @@ export function useMicAnalyser() {
       analyserRef.current = analyser;
       setIsMicActive(true);
 
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+
       const tick = () => {
         if (!analyserRef.current) return;
         analyserRef.current.getByteFrequencyData(buffer);
@@ -71,5 +75,8 @@ export function useMicAnalyser() {
     }
   }, [stopMic]);
 
-  return { frequencyData, isMicActive, startMic, stopMic };
+  const getStream = useCallback(() => streamRef.current, []);
+  const getAnalyser = useCallback(() => analyserRef.current, []);
+
+  return { frequencyData, isMicActive, startMic, stopMic, getStream, getAnalyser };
 }

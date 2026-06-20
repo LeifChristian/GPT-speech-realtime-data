@@ -23,10 +23,7 @@ const SidePanel = ({
 
   const handleAddConversation = (e) => {
     e.stopPropagation();
-    const conversationName = prompt('Enter a name for the new conversation');
-    if (conversationName) {
-      onAddConversation(conversationName);
-    }
+    onAddConversation();
   };
 
   const handleRenameConversation = (e, conversationId) => {

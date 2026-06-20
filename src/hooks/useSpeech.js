@@ -1,11 +1,18 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useMicAnalyser } from './useMicAnalyser';
+import { usesMobileVoicePath } from '../utils/voiceDevice';
+import { getRecorderMimeType, transcribeAudio } from '../utils/transcribeAudio';
 
 const RELISTEN_DELAY_MS = 750;
 const SKIP_TO_LISTEN_DELAY_MS = 200;
 const VOICE_INACTIVITY_MS = 3 * 60 * 1000;
+const MOBILE_SILENCE_THRESHOLD = 12;
+const MOBILE_SILENCE_MS = 1600;
+const MOBILE_MAX_RECORDING_MS = 30000;
+const MOBILE_MAX_WAIT_FOR_SPEECH_MS = 8000;
+const MOBILE_MIN_RECORDING_MS = 600;
 
-export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
+export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = typeof window !== 'undefined' ? window.innerWidth : 1024) => {
   const [isRecording, setIsRecording] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayPause, setShowPlayPause] = useState(false);
@@ -27,7 +34,13 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
   const stopVoiceModeRef = useRef(() => {});
   const resetInactivityTimerRef = useRef(() => {});
 
-  const { frequencyData, isMicActive, startMic, stopMic } = useMicAnalyser();
+  const mobileVoicePath = useMemo(() => usesMobileVoicePath(windowWidth), [windowWidth]);
+  const mediaRecorderRef = useRef(null);
+  const mobileVadRafRef = useRef(null);
+  const mobileHadSpeechRef = useRef(false);
+  const mobileStoppingRef = useRef(false);
+
+  const { frequencyData, isMicActive, startMic, stopMic, getStream, getAnalyser } = useMicAnalyser();
 
   useEffect(() => {
     handleGreetingRef.current = handleGreeting;
@@ -63,6 +76,36 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
     resetInactivityTimerRef.current = resetInactivityTimer;
   }, [resetInactivityTimer]);
 
+  const getVolumeLevel = useCallback(() => {
+    const analyser = getAnalyser();
+    if (!analyser) return 0;
+    const buffer = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(buffer);
+    return buffer.reduce((sum, value) => sum + value, 0) / buffer.length;
+  }, [getAnalyser]);
+
+  const cancelMobileVad = useCallback(() => {
+    if (mobileVadRafRef.current) {
+      cancelAnimationFrame(mobileVadRafRef.current);
+      mobileVadRafRef.current = null;
+    }
+  }, []);
+
+  const stopMobileRecorder = useCallback(() => {
+    cancelMobileVad();
+    mobileStoppingRef.current = true;
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== 'inactive') {
+      try {
+        recorder.stop();
+      } catch {
+        // ignore
+      }
+    } else {
+      mobileStoppingRef.current = false;
+    }
+  }, [cancelMobileVad]);
+
   const startListeningInternal = useCallback(() => {
     const rec = recognitionRef.current;
     if (!rec || !voiceModeRef.current) return;
@@ -83,8 +126,192 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
     }
   }, []);
 
+  const listenInternalRef = useRef(() => {});
+  const scheduleRelistenRef = useRef(() => {});
+
+  const startMobileListeningInternal = useCallback(() => {
+    if (!mobileVoicePath || !voiceModeRef.current) return;
+    if (isProcessingRef.current || awaitingTtsRef.current) return;
+    if (typeof window !== 'undefined' && window.speechSynthesis?.speaking) return;
+
+    const stream = getStream();
+    if (!stream || typeof MediaRecorder === 'undefined') return;
+
+    cancelMobileVad();
+    mobileHadSpeechRef.current = false;
+    mobileStoppingRef.current = false;
+
+    const mimeType = getRecorderMimeType();
+    const chunks = [];
+    let recorder;
+
+    try {
+      recorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
+    } catch (err) {
+      console.error('MediaRecorder init failed:', err);
+      return;
+    }
+
+    mediaRecorderRef.current = recorder;
+
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) chunks.push(event.data);
+    };
+
+    recorder.onstop = async () => {
+      cancelMobileVad();
+      mediaRecorderRef.current = null;
+      setIsRecording(false);
+
+      const hadSpeech = mobileHadSpeechRef.current;
+      mobileHadSpeechRef.current = false;
+      const wasStopping = mobileStoppingRef.current;
+      mobileStoppingRef.current = false;
+
+      if (!voiceModeRef.current || !wasStopping) return;
+
+      if (!hadSpeech) {
+        setInterimTranscript('');
+        if (voiceModeRef.current && !isProcessingRef.current && !awaitingTtsRef.current) {
+          scheduleRelistenRef.current();
+        }
+        return;
+      }
+
+      const blobType = mimeType || recorder.mimeType || 'audio/webm';
+      const blob = new Blob(chunks, { type: blobType });
+      if (blob.size < 800) {
+        setInterimTranscript('');
+        if (voiceModeRef.current && !isProcessingRef.current && !awaitingTtsRef.current) {
+          scheduleRelistenRef.current();
+        }
+        return;
+      }
+
+      isProcessingRef.current = true;
+      setIsProcessing(true);
+      setVoiceStatus('processing');
+
+      try {
+        const transcript = await transcribeAudio(blob, blobType);
+        if (!transcript) {
+          setInterimTranscript('');
+          if (voiceModeRef.current && !awaitingTtsRef.current) {
+            scheduleRelistenRef.current();
+          }
+          return;
+        }
+
+        resetInactivityTimerRef.current();
+        setFinalTranscript(transcript);
+        setEnteredText(transcript);
+        setInterimTranscript(transcript);
+
+        await Promise.resolve(handleGreetingRef.current(transcript));
+      } catch (err) {
+        console.error('Mobile transcription failed:', err);
+        setInterimTranscript('');
+        if (voiceModeRef.current && !awaitingTtsRef.current) {
+          scheduleRelistenRef.current();
+        }
+      } finally {
+        isProcessingRef.current = false;
+        setIsProcessing(false);
+        if (voiceModeRef.current && !awaitingTtsRef.current) {
+          setVoiceStatus('listening');
+          scheduleRelistenRef.current();
+        }
+      }
+    };
+
+    setVoiceStatus('listening');
+    setIsRecording(true);
+    setInterimTranscript('');
+
+    try {
+      recorder.start(250);
+    } catch (err) {
+      console.error('MediaRecorder start failed:', err);
+      mediaRecorderRef.current = null;
+      setIsRecording(false);
+      return;
+    }
+
+    const startedAt = Date.now();
+    let lastLoudAt = startedAt;
+
+    const vadTick = () => {
+      if (!voiceModeRef.current || mediaRecorderRef.current !== recorder) return;
+      if (isProcessingRef.current || awaitingTtsRef.current) {
+        mobileVadRafRef.current = requestAnimationFrame(vadTick);
+        return;
+      }
+
+      const now = Date.now();
+      const elapsed = now - startedAt;
+      const level = getVolumeLevel();
+
+      if (level > MOBILE_SILENCE_THRESHOLD) {
+        mobileHadSpeechRef.current = true;
+        lastLoudAt = now;
+        resetInactivityTimerRef.current();
+      }
+
+      const silenceFor = now - lastLoudAt;
+      const shouldStop =
+        elapsed >= MOBILE_MAX_RECORDING_MS ||
+        (mobileHadSpeechRef.current &&
+          silenceFor >= MOBILE_SILENCE_MS &&
+          elapsed >= MOBILE_MIN_RECORDING_MS);
+
+      if (shouldStop) {
+        stopMobileRecorder();
+        return;
+      }
+
+      if (!mobileHadSpeechRef.current && elapsed >= MOBILE_MAX_WAIT_FOR_SPEECH_MS) {
+        stopMobileRecorder();
+        return;
+      }
+
+      mobileVadRafRef.current = requestAnimationFrame(vadTick);
+    };
+
+    mobileVadRafRef.current = requestAnimationFrame(vadTick);
+  }, [
+    mobileVoicePath,
+    getStream,
+    getVolumeLevel,
+    cancelMobileVad,
+    stopMobileRecorder,
+  ]);
+
+  useEffect(() => {
+    listenInternalRef.current = mobileVoicePath
+      ? startMobileListeningInternal
+      : startListeningInternal;
+  }, [mobileVoicePath, startMobileListeningInternal, startListeningInternal]);
+
   const stopListeningInternal = useCallback(() => {
     setIsRecording(false);
+
+    if (mobileVoicePath) {
+      mobileStoppingRef.current = false;
+      cancelMobileVad();
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== 'inactive') {
+        try {
+          recorder.stop();
+        } catch {
+          // ignore
+        }
+      }
+      mediaRecorderRef.current = null;
+      return;
+    }
+
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
@@ -92,7 +319,7 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
         // ignore
       }
     }
-  }, []);
+  }, [mobileVoicePath, cancelMobileVad]);
 
   /** Invalidate queued TTS segments and stop current utterance */
   const cancelActiveSpeech = useCallback(() => {
@@ -110,12 +337,19 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
       relistenTimerRef.current = null;
       if (!voiceModeRef.current || isProcessingRef.current || awaitingTtsRef.current) return;
       if (typeof window !== 'undefined' && window.speechSynthesis?.speaking) return;
-      startListeningInternal();
+      listenInternalRef.current();
     }, delayMs);
-  }, [clearRelistenTimer, startListeningInternal]);
+  }, [clearRelistenTimer]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    scheduleRelistenRef.current = scheduleRelisten;
+  }, [scheduleRelisten]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || mobileVoicePath) {
+      recognitionRef.current = null;
+      return undefined;
+    }
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) {
       recognitionRef.current = null;
@@ -214,7 +448,7 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
       }
       recognitionRef.current = null;
     };
-  }, [scheduleRelisten, stopMic, clearRelistenTimer]);
+  }, [scheduleRelisten, stopMic, clearRelistenTimer, mobileVoicePath]);
 
   const stopVoiceMode = useCallback(() => {
     voiceModeRef.current = false;
@@ -225,20 +459,27 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
     setIsProcessing(false);
     clearRelistenTimer();
     clearInactivityTimer();
+    mobileStoppingRef.current = false;
+    cancelMobileVad();
     stopListeningInternal();
     stopMic();
     cancelActiveSpeech();
     setIsPlaying(false);
     setShowPlayPause(false);
     setInterimTranscript('');
-  }, [clearRelistenTimer, clearInactivityTimer, stopListeningInternal, stopMic, cancelActiveSpeech]);
+  }, [clearRelistenTimer, clearInactivityTimer, stopListeningInternal, stopMic, cancelActiveSpeech, cancelMobileVad]);
 
   useEffect(() => {
     stopVoiceModeRef.current = stopVoiceMode;
   }, [stopVoiceMode]);
 
   const startVoiceMode = useCallback(async () => {
-    if (!recognitionRef.current) {
+    if (mobileVoicePath) {
+      if (typeof MediaRecorder === 'undefined') {
+        alert('Voice recording is not supported on this device/browser.');
+        return;
+      }
+    } else if (!recognitionRef.current) {
       alert('Voice input is not supported on this device/browser.');
       return;
     }
@@ -254,8 +495,8 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
     voiceModeRef.current = true;
     setVoiceModeActive(true);
     resetInactivityTimer();
-    startListeningInternal();
-  }, [startMic, startListeningInternal, cancelActiveSpeech, resetInactivityTimer]);
+    listenInternalRef.current();
+  }, [mobileVoicePath, startMic, cancelActiveSpeech, resetInactivityTimer]);
 
   const toggleVoiceMode = useCallback(() => {
     if (voiceModeRef.current) {
@@ -309,6 +550,9 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
       awaitingTtsRef.current = true;
       setVoiceStatus('speaking');
       stopListeningInternal();
+      if (mobileVoicePath) {
+        setInterimTranscript('');
+      }
     }
 
     setShowPlayPause(true);
@@ -410,7 +654,7 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
     } else {
       synthesizeSegments();
     }
-  }, [onSpeechComplete, stopListeningInternal, toggle, cancelActiveSpeech]);
+  }, [onSpeechComplete, stopListeningInternal, toggle, cancelActiveSpeech, mobileVoicePath]);
 
   const stopSpeakText = useCallback(() => {
     cancelActiveSpeech();
@@ -462,6 +706,7 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
     return () => {
       clearRelistenTimer();
       clearInactivityTimer();
+      cancelMobileVad();
       voiceModeRef.current = false;
       if (recognitionRef.current) {
         try {
@@ -474,7 +719,7 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
         window.speechSynthesis.cancel();
       }
     };
-  }, [clearRelistenTimer, clearInactivityTimer]);
+  }, [clearRelistenTimer, clearInactivityTimer, cancelMobileVad]);
 
   return {
     isRecording,
