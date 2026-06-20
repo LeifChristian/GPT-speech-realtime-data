@@ -18,9 +18,10 @@ const AudioControls = ({
   const hasSpeechRecognition = typeof window !== 'undefined' && (
     window.SpeechRecognition || window.webkitSpeechRecognition
   );
-  const isTouchDevice = typeof window !== 'undefined' && (
-    'ontouchstart' in window || (navigator && navigator.maxTouchPoints > 0)
-  );
+  // Hide voice input on mobile viewports only; touch detection is unreliable on desktop
+  // (many laptops report maxTouchPoints > 0 even without a touchscreen).
+  const MOBILE_BREAKPOINT = 768;
+  const showStartButton = windowWidth >= MOBILE_BREAKPOINT && hasSpeechRecognition;
 
   const handleStop = () => {
     sendStop();
@@ -33,7 +34,7 @@ const AudioControls = ({
 
   return (
     <div className="buttons-container">
-      {windowWidth >= 468 && hasSpeechRecognition && !isTouchDevice && (
+      {showStartButton && (
         <button
           className="button"
           onClick={() => startRecording()}

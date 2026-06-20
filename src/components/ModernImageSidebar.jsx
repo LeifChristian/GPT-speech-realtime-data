@@ -12,6 +12,16 @@ const ModernImageSidebar = ({ sessionImages, onImageSelect, generatedImage, isOp
 
     const downloadImage = async (imageUrl, prompt) => {
         try {
+            if (String(imageUrl).startsWith('data:')) {
+                const link = document.createElement('a');
+                link.href = imageUrl;
+                link.download = `generated-image-${Date.now()}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                return;
+            }
+
             const response = await fetch(imageUrl);
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);

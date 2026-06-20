@@ -8,6 +8,7 @@ const {
   validateUpload
 } = require('../middleware/uploadMiddleware');
 const axios = require('axios');
+const { imageResultToContent, buildImageGenerateParams } = require('../utils/imageResponse');
 
 // Lightweight request logging for image routes (helps debug mobile issues on DO)
 const logRequest = (req, res, next) => {
@@ -84,16 +85,13 @@ router.post('/generate', async (req, res) => {
   }
 
   try {
-    const model = (req.app.locals.models && req.app.locals.models.imageModel) || process.env.OPENAI_IMAGE_MODEL || 'dall-e-3';
-    const response = await req.app.locals.openai.images.generate({
-      model: model,
-      prompt: prompt,
-      n: 1,
-      size: "1024x1024",
-    });
-    const imageUrl = response.data[0].url;
-    console.log(`[IMG][${req._rid}] Image generated url=${imageUrl ? 1 : 0}`);
-    res.json({ type: 'image', content: imageUrl });
+    const model = (req.app.locals.models && req.app.locals.models.imageModel) || process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1';
+    const params = buildImageGenerateParams(model, prompt);
+    console.log(`[IMG][${req._rid}] generate model=${model}`);
+    const response = await req.app.locals.openai.images.generate(params);
+    const imageContent = imageResultToContent(response);
+    console.log(`[IMG][${req._rid}] Image generated format=${imageContent.startsWith('data:') ? 'base64' : 'url'}`);
+    res.json({ type: 'image', content: imageContent });
   } catch (error) {
     const status = error.response?.status;
     const data = error.response?.data;
@@ -102,14 +100,16 @@ router.post('/generate', async (req, res) => {
   }
 });
 
-module.exports = router;
-
-// Secure proxy download to bypass browser CORS when saving generated images
+// Secure proxy download to bypass browser CORS when saving hosted generated images
 router.get('/download', async (req, res) => {
   try {
     const { url } = req.query;
     if (!url) {
       return res.status(400).json({ error: 'Missing url parameter' });
+    }
+
+    if (String(url).startsWith('data:')) {
+      return res.status(400).json({ error: 'Data URLs should be downloaded directly in the browser' });
     }
 
     // Basic allowlist to mitigate SSRF risk
@@ -137,3 +137,5 @@ router.get('/download', async (req, res) => {
     res.status(500).json({ error: 'Failed to download image' });
   }
 });
+
+module.exports = router;
