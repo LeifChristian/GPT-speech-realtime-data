@@ -85,7 +85,7 @@ const VoiceVisualizer = ({ frequencyData, isActive, status = 'listening', interi
           className="w-full h-14 rounded-lg bg-black/30"
           aria-hidden="true"
         />
-        {interimTranscript && status === 'listening' && (
+        {interimTranscript && (status === 'listening' || status === 'processing') && (
           <p className="mt-2 text-sm text-white/70 italic truncate">
             &ldquo;{interimTranscript}&rdquo;
           </p>

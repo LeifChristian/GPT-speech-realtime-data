@@ -11,6 +11,7 @@ const imageRouter = require('./routes/imageRoutes');
 const chatRouter = require('./routes/chatRoutes');
 const fileRouter = require('./routes/fileRoutes');
 const modelRouter = require('./routes/modelRoutes');
+const audioRouter = require('./routes/audioRoutes');
 const { getDefaultRuntime } = require('./config/models');
 const { getOpenAIClient } = require('./providers/openai');
 
@@ -48,6 +49,7 @@ app.use('/models', modelRouter);
 app.use('/image', imageRouter);
 app.use('/chat', chatRouter);
 app.use('/file', fileRouter);
+app.use('/audio', audioRouter);
 
 // Dev-only: helpful message if you open the API port in a browser
 if (process.env.NODE_ENV !== 'production') {

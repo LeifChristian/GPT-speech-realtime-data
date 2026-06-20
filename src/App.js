@@ -144,7 +144,7 @@ function App() {
     interimTranscript,
     stopVoiceMode,
     skipSpeechAndListen,
-  } = useSpeech(setRez, handleGreeting, setEnteredText);
+  } = useSpeech(setRez, handleGreeting, setEnteredText, windowWidth);
 
   useEffect(() => {
     speakTextRef.current = speakText;
@@ -276,8 +276,8 @@ function App() {
 
       <ModernSidePanel
         onSelectConversation={onSelectConversation}
-        onAddConversation={(name) => {
-          const created = handleAddConversation(name);
+        onAddConversation={() => {
+          const created = handleAddConversation();
           // Clear UI state for a fresh conversation
           setEnteredText('');
           setRez('');

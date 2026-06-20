@@ -28,16 +28,11 @@ const ModernSidePanel = ({
 
     const handleAddConversation = (e) => {
         e.stopPropagation();
-        // Show one prompt here only; hook will not prompt again
-        const conversationName = prompt('Enter a name for the new conversation');
-        if (conversationName) {
-            const created = onAddConversation(conversationName);
-            // Auto-select and close panel
-            if (created && created.id) {
-                handleSelectConversation(created.id, created);
-            }
-            setIsOpen(false);
+        const created = onAddConversation();
+        if (created && created.id) {
+            handleSelectConversation(created.id, created);
         }
+        setIsOpen(false);
     };
 
     const handleRenameConversation = (e, conversationId) => {

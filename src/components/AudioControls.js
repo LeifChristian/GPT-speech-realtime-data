@@ -2,6 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { AnimatePresence } from 'framer-motion';
 import VoiceVisualizer from './VoiceVisualizer';
+import { canUseVoice } from '../utils/voiceDevice';
 
 const AudioControls = ({
   windowWidth,
@@ -24,11 +25,7 @@ const AudioControls = ({
   setShowPlayPause,
   setIsPlaying,
 }) => {
-  const hasSpeechRecognition = typeof window !== 'undefined' && (
-    window.SpeechRecognition || window.webkitSpeechRecognition
-  );
-  const MOBILE_BREAKPOINT = 768;
-  const showVoiceButton = windowWidth >= MOBILE_BREAKPOINT && hasSpeechRecognition;
+  const showVoiceButton = canUseVoice(windowWidth);
 
   const handleStop = () => {
     stopVoiceMode?.();

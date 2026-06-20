@@ -1,6 +1,20 @@
 import { useState, useEffect } from 'react';
 import { apiUrl } from '../utils/api';
 
+export function getDefaultConversationName(date = new Date()) {
+  const formattedDate = date.toLocaleDateString('en-US', {
+    month: '2-digit',
+    day: '2-digit',
+    year: '2-digit',
+  });
+  const formattedTime = date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+  return `Convo ${formattedDate} ${formattedTime}`;
+}
+
 export const useConversations = (apiKey, setRez, handleResponse) => {
   const [conversations, setConversations] = useState([]);
   const [selectedConversationId, setSelectedConversationId] = useState(null);
@@ -47,9 +61,10 @@ export const useConversations = (apiKey, setRez, handleResponse) => {
   }, [conversations, selectedConversationId, thisConversation]);
 
   const handleAddConversation = (name) => {
+    const conversationName = name?.trim() || getDefaultConversationName();
     const newConversation = {
       id: Date.now().toString(),
-      name: name,
+      name: conversationName,
       history: '',
     };
 
@@ -59,17 +74,14 @@ export const useConversations = (apiKey, setRez, handleResponse) => {
     setSelectedConversationId(newConversation.id);
     setThisConversation(newConversation);
 
-    addDebugLog(`Added to conversations list: ${name}, total: ${updatedConversations.length}`);
+    addDebugLog(`Added to conversations list: ${conversationName}, total: ${updatedConversations.length}`);
     return newConversation;
   };
 
   const createAndSelectConversation = async () => {
-    const now = new Date();
-    const formattedDate = now.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) + ' ' + now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-
     const newConversation = {
       id: Date.now().toString(),
-      name: `Convo ${formattedDate}`,
+      name: getDefaultConversationName(),
       history: ''
     };
 
@@ -93,11 +105,7 @@ export const useConversations = (apiKey, setRez, handleResponse) => {
       let currentConversation = conversations.find(conv => conv.id === selectedConversationId);
 
       if (!currentConversation) {
-        // Auto-create if none selected
-        const now = new Date();
-        const date = now.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
-        const time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-        const autoName = `Convo ${date} ${time}`;
+        const autoName = getDefaultConversationName();
         addDebugLog(`Auto-creating conversation: ${autoName}`);
         currentConversation = {
           id: Date.now().toString(),
