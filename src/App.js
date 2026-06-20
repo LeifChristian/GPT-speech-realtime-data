@@ -234,14 +234,6 @@ function App() {
       {/* Background Effects - semi-transparent gradient over Matrix image */}
       <div className="absolute inset-0 bg-gradient-to-br from-gray-900/30 via-gray-800/40 to-black/60 pointer-events-none" />
 
-      <ModelSelector
-        models={models}
-        loading={modelsLoading}
-        saving={modelsSaving}
-        error={modelsError}
-        onChange={updateModels}
-      />
-
       {/* Toggle Conversation History Button (top-right, offset when image sidebar present) */}
       <motion.div className="fixed top-4 right-4 z-[60]" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
         <Button
@@ -342,6 +334,14 @@ function App() {
             Intelligent conversations with image generation
           </p>
         </motion.div>
+
+        <ModelSelector
+          models={models}
+          loading={modelsLoading}
+          saving={modelsSaving}
+          error={modelsError}
+          onChange={updateModels}
+        />
 
         {/* Audio Controls */}
         <motion.div

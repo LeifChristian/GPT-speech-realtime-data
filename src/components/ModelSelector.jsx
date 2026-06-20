@@ -1,14 +1,27 @@
-import React from 'react';
+import React, { useState } from 'react';
 import PropTypes from 'prop-types';
-import { Settings2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Settings2, ChevronDown } from 'lucide-react';
 import { GlassCard } from './ui/Card';
 
+function getActiveLabel(models, key) {
+  const activeId = models?.active?.[key];
+  if (!activeId) return null;
+  const category = key.replace('Model', '');
+  const options = models?.available?.[category] || [];
+  return options.find((o) => o.id === activeId)?.label || activeId;
+}
+
 const ModelSelector = ({ models, loading, saving, error, onChange }) => {
+  const [collapsed, setCollapsed] = useState(true);
+
   if (loading && !models) {
     return (
-      <GlassCard className="fixed top-4 left-4 z-[60] p-3 text-white/70 text-sm">
-        Loading models...
-      </GlassCard>
+      <div className="w-full max-w-md mx-auto mb-3 px-3 sm:px-4">
+        <GlassCard className="p-3 text-white/70 text-sm text-center">
+          Loading models...
+        </GlassCard>
+      </div>
     );
   }
 
@@ -16,10 +29,8 @@ const ModelSelector = ({ models, loading, saving, error, onChange }) => {
     return null;
   }
 
-  const handleSelect = (category, key, value) => {
-    if (!value || value === models.active[key]) {
-      return;
-    }
+  const handleSelect = (key, value) => {
+    if (!value || value === models.active[key]) return;
     onChange({ [key]: value });
   };
 
@@ -29,38 +40,73 @@ const ModelSelector = ({ models, loading, saving, error, onChange }) => {
     { key: 'imageModel', label: 'Image', options: models.available.image },
   ];
 
+  const chatLabel = getActiveLabel(models, 'textModel');
+  const collapsedHint = chatLabel ? `Models · ${chatLabel}` : 'Models';
+
   return (
-    <GlassCard className="fixed top-4 left-4 z-[60] p-3 w-[min(92vw,320px)]">
-      <div className="flex items-center gap-2 mb-3 text-white">
-        <Settings2 className="h-4 w-4" />
-        <span className="text-sm font-medium">Models</span>
-        {saving && <span className="text-xs text-white/60">Saving...</span>}
-      </div>
+    <div className="w-full max-w-md mx-auto mb-3 px-3 sm:px-4 relative z-20">
+      <GlassCard className="overflow-hidden shadow-lg shadow-black/20">
+        <button
+          type="button"
+          className="flex w-full items-center justify-between gap-2 px-3 sm:px-4 py-2.5 text-white hover:bg-white/5 transition-colors"
+          onClick={() => setCollapsed((v) => !v)}
+          aria-expanded={!collapsed}
+          aria-controls="model-selector-content"
+        >
+          <span className="flex min-w-0 items-center gap-2 text-sm font-medium">
+            <Settings2 className="h-4 w-4 shrink-0" />
+            <span className="truncate">
+              {collapsed ? collapsedHint : 'Models'}
+            </span>
+            {saving && (
+              <span className="text-xs text-white/60 font-normal shrink-0">Saving...</span>
+            )}
+          </span>
+          <ChevronDown
+            className={`h-4 w-4 shrink-0 text-white/70 transition-transform duration-200 ${
+              collapsed ? '' : 'rotate-180'
+            }`}
+          />
+        </button>
 
-      <div className="space-y-3">
-        {sections.map(({ key, label, options }) => (
-          <label key={key} className="block">
-            <span className="text-xs uppercase tracking-wide text-white/60">{label}</span>
-            <select
-              className="mt-1 w-full rounded-md border border-white/20 bg-black/30 px-2 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-400/50"
-              value={models.active[key]}
-              disabled={saving}
-              onChange={(event) => handleSelect(label.toLowerCase(), key, event.target.value)}
+        <AnimatePresence initial={false}>
+          {!collapsed && (
+            <motion.div
+              id="model-selector-content"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2, ease: 'easeInOut' }}
+              className="overflow-hidden"
             >
-              {options.map((option) => (
-                <option key={option.id} value={option.id} className="text-black">
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        ))}
-      </div>
+              <div className="px-3 sm:px-4 pb-4 pt-1 border-t border-white/10 max-h-[min(50vh,320px)] overflow-y-auto">
+                <div className="space-y-3 mt-2">
+                  {sections.map(({ key, label, options }) => (
+                    <label key={key} className="block">
+                      <span className="text-xs uppercase tracking-wide text-white/60">{label}</span>
+                      <select
+                        className="mt-1 w-full rounded-md border border-white/20 bg-black/30 px-2 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-400/50"
+                        value={models.active[key]}
+                        disabled={saving}
+                        onChange={(event) => handleSelect(key, event.target.value)}
+                      >
+                        {options.map((option) => (
+                          <option key={option.id} value={option.id} className="text-black">
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
+                </div>
 
-      {error && (
-        <p className="mt-2 text-xs text-red-300">{error}</p>
-      )}
-    </GlassCard>
+                {error && <p className="mt-2 text-xs text-red-300">{error}</p>}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </GlassCard>
+    </div>
   );
 };
 
