@@ -1,7 +1,7 @@
 import { apiUrl } from '../utils/api';
 import React, { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, MessageSquare, User, Bot, ImagePlus, Send, Square, Play, Pause, Mic } from 'lucide-react';
+import { X, MessageSquare, User, Bot, ImagePlus, Send, Square, Play, Pause, Mic, FastForward } from 'lucide-react';
 import { Button } from './ui/Button';
 import { GlassCard } from './ui/Card';
 import VoiceVisualizer from './VoiceVisualizer';
@@ -23,6 +23,8 @@ const ModernConversationOverlay = ({
     interimTranscript = '',
     startVoiceMode,
     stopVoiceMode,
+    skipSpeechAndListen,
+    isPlaying = false,
 }) => {
     // Local input state (must be declared before any conditional returns)
     const [inputText, setInputText] = useState('');
@@ -43,6 +45,14 @@ const ModernConversationOverlay = ({
     const [analyzedImages, setAnalyzedImages] = useState([]);
     const [fullImage, setFullImage] = useState(null);
 
+    const messagesEndRef = useRef(null);
+
+    const scrollToBottom = (behavior = 'smooth') => {
+        requestAnimationFrame(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior, block: 'end' });
+        });
+    };
+
     // Re-add useEffect to parse history
     useEffect(() => {
         if (conversation?.history) {
@@ -60,6 +70,14 @@ const ModernConversationOverlay = ({
             setMessages([]);
         }
     }, [conversation]);
+
+    useEffect(() => {
+        const behavior =
+            voiceModeActive && (voiceStatus === 'listening' || interimTranscript)
+                ? 'auto'
+                : 'smooth';
+        scrollToBottom(behavior);
+    }, [messages, conversation?.history, isProcessing, voiceModeActive, voiceStatus, interimTranscript]);
 
     // Parse conversation history better
     const parseHistory = (history) => {
@@ -330,7 +348,7 @@ const ModernConversationOverlay = ({
                     <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
                         {messages.map((message, index) => (
                             <motion.div
-                                key={index}
+                                key={message.id ?? index}
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: index * 0.1 }}
@@ -385,6 +403,7 @@ const ModernConversationOverlay = ({
                                 )}
                             </motion.div>
                         ))}
+                        <div ref={messagesEndRef} aria-hidden="true" className="h-px shrink-0" />
                     </div>
 
                     {/* Footer: controls + stacked input with auto-grow and send below */}
@@ -407,6 +426,19 @@ const ModernConversationOverlay = ({
                                 )}
                             </div>
                             <div className="flex items-center gap-2">
+                            {voiceModeActive && (voiceStatus === 'speaking' || isPlaying) && (
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-white hover:bg-white/10"
+                                    onClick={() => skipSpeechAndListen?.()}
+                                    title="Skip speech and start listening"
+                                    aria-label="Fast forward to listening"
+                                >
+                                    <FastForward className="h-5 w-5" />
+                                </Button>
+                            )}
                             <Button type="button" variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={() => { window.speechSynthesis.cancel(); setIsSpeaking(false); if (stopVoiceMode && voiceModeActive) stopVoiceMode(); }} title="Stop speech" aria-label="Stop speech">
                                 <Square className="h-5 w-5" />
                             </Button>

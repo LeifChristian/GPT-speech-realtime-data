@@ -143,6 +143,7 @@ function App() {
     frequencyData,
     interimTranscript,
     stopVoiceMode,
+    skipSpeechAndListen,
   } = useSpeech(setRez, handleGreeting, setEnteredText);
 
   useEffect(() => {
@@ -310,6 +311,8 @@ function App() {
             interimTranscript={interimTranscript}
             startVoiceMode={startRecording}
             stopVoiceMode={stopVoiceMode}
+            skipSpeechAndListen={skipSpeechAndListen}
+            isPlaying={isPlaying}
           />
         )}
       </AnimatePresence>
@@ -376,6 +379,7 @@ function App() {
             interimTranscript={interimTranscript}
             startRecording={startRecording}
             stopVoiceMode={stopVoiceMode}
+            skipSpeechAndListen={skipSpeechAndListen}
             sendStop={sendStop}
             stopSpeakText={stopSpeakText}
             toggleMute={toggleMute}

@@ -14,6 +14,7 @@ const AudioControls = ({
   interimTranscript,
   startRecording,
   stopVoiceMode,
+  skipSpeechAndListen,
   sendStop,
   stopSpeakText,
   toggleMute,
@@ -63,6 +64,17 @@ const AudioControls = ({
           Stop
         </button>
 
+        {voiceModeActive && (voiceStatus === 'speaking' || isPlaying) && (
+          <button
+            className="button"
+            onClick={() => skipSpeechAndListen?.()}
+            type="button"
+            title="Skip speech and start listening"
+          >
+            FFwd
+          </button>
+        )}
+
         {isPlaying && (
           <button
             className="button"
@@ -109,6 +121,7 @@ AudioControls.propTypes = {
   interimTranscript: PropTypes.string,
   startRecording: PropTypes.func.isRequired,
   stopVoiceMode: PropTypes.func,
+  skipSpeechAndListen: PropTypes.func,
   sendStop: PropTypes.func.isRequired,
   stopSpeakText: PropTypes.func.isRequired,
   toggleMute: PropTypes.func.isRequired,

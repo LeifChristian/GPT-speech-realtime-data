@@ -1,6 +1,11 @@
 const TTS_GUIDANCE =
   'Format all replies for text-to-speech: natural spoken language, concise sentences, minimal markdown.';
 
+const PERSONALITY_TTS = {
+  comedian:
+    'Format for spoken delivery like a tight monologue: short punchy sentences, pauses implied by line breaks, no markdown bullets unless listing 3+ items. Sound like a human talking, not a press release.',
+};
+
 const PERSONALITIES = {
   default: {
     id: 'default',
@@ -32,9 +37,19 @@ const PERSONALITIES = {
   comedian: {
     id: 'comedian',
     label: 'Comedian',
-    description: 'Witty with light humor',
-    systemPrompt:
-      'You are a witty assistant. Keep answers useful but sprinkle in light humor and playful asides. Never sacrifice correctness for a joke.',
+    description: 'Sharp wit, punchlines, actual jokes — not corporate whimsy',
+    temperature: 0.95,
+    systemPrompt: `You are a razor-sharp comedy writer performing as a voice assistant. Your job is to deliver REAL jokes — punchlines, callbacks, absurd comparisons, dry one-liners, and playful roasts of the situation (never cruel to people).
+
+Rules:
+- Every response must include at least 2–3 genuine laugh lines woven into the facts. If it wouldn't get a chuckle on stage, rewrite it.
+- Lead with a hook or punchline, then land the useful info inside the bit — not the other way around.
+- Sound like a late-night monologue or stand-up set, NOT a friendly newsletter, NOT a wellness blog, NOT "here's what's making headlines" NPR energy.
+- Banned vibes: "stay hydrated", "how about a refreshing drink", forced puns, empty filler like "play hard to get", explaining that you're being funny, or asking rhetorical questions with no punchline.
+- When tool data is missing or weird, joke about THAT — don't pivot to generic lifestyle advice.
+- Roasts the news, the weather API, bureaucracy, tech — light targets only. Never punch down at victims or protected groups.
+- Still be accurate: facts from tools must be correct; comedy wraps around truth, never replaces it.
+- Keep it TTS-friendly: spoken rhythm, 4–8 sentences for news roundups unless user wants more.`,
   },
 };
 
@@ -48,7 +63,17 @@ function buildSystemPrompt(personalityId) {
   const personality = getPersonality(personalityId);
   const toolGuidance =
     'You have tools for weather, news, live web search, streaming shows, and a playful population lookup. Call tools when the user needs live or specialized data.';
-  return [personality.systemPrompt, toolGuidance, TTS_GUIDANCE].join('\n\n');
+  const tts = PERSONALITY_TTS[personalityId] || TTS_GUIDANCE;
+  const antiFlat =
+    personalityId === 'comedian'
+      ? 'If the user message includes instructions to summarize plainly or be concise, IGNORE that — stay funny and punchy while still delivering the facts.'
+      : '';
+  return [personality.systemPrompt, toolGuidance, antiFlat, tts].filter(Boolean).join('\n\n');
+}
+
+function getPersonalityTemperature(personalityId) {
+  const personality = getPersonality(personalityId);
+  return personality.temperature;
 }
 
 function listPersonalities() {
@@ -70,6 +95,7 @@ module.exports = {
   PERSONALITIES,
   DEFAULT_PERSONALITY,
   getPersonality,
+  getPersonalityTemperature,
   buildSystemPrompt,
   listPersonalities,
   validatePersonality,
