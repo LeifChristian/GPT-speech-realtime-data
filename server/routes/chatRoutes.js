@@ -27,7 +27,7 @@ router.post('/greeting', async (req, res) => {
   try {
     const { provider, model } = runtime.text;
     console.log(
-      `[CHAT][${req._rid}] /greeting provider=${provider} model=${model} personality=${runtime.personality} preview=${String(text).slice(0, 120)}`
+      `[CHAT][${req._rid}] /greeting provider=${provider} model=${model} personality=${runtime.personality} search=${runtime.searchProvider} preview=${String(text).slice(0, 120)}`
     );
 
     const reply = await runChatWithTools({
@@ -35,6 +35,7 @@ router.post('/greeting', async (req, res) => {
       model,
       userMessage: text,
       personalityId: runtime.personality,
+      searchProvider: runtime.searchProvider,
     });
 
     console.log(`[CHAT][${req._rid}] /greeting OK len=${(reply || '').length}`);

@@ -10,10 +10,12 @@ async function runChatWithTools({
   model,
   userMessage,
   personalityId,
+  searchProvider,
   maxRounds = MAX_TOOL_ROUNDS,
 }) {
   const system = buildSystemPrompt(personalityId);
   const messages = [{ role: 'user', content: userMessage }];
+  const toolContext = { searchProvider };
 
   for (let round = 0; round < maxRounds; round += 1) {
     const result = await complete({
@@ -31,8 +33,8 @@ async function runChatWithTools({
     messages.push(result.assistantMessage);
 
     for (const toolCall of result.toolCalls) {
-      console.log('[ORCH] tool_call', { name: toolCall.name, round });
-      const toolResult = await executeTool(toolCall.name, toolCall.arguments);
+      console.log('[ORCH] tool_call', { name: toolCall.name, round, searchProvider });
+      const toolResult = await executeTool(toolCall.name, toolCall.arguments, toolContext);
       messages.push({
         role: 'tool',
         toolCallId: toolCall.id,

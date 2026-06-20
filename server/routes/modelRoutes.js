@@ -10,14 +10,14 @@ router.get('/', (req, res) => {
 router.post('/', (req, res) => {
   try {
     const updates = req.body || {};
-    const hasUpdate = ['text', 'vision', 'image', 'personality'].some(
+    const hasUpdate = ['text', 'vision', 'image', 'personality', 'searchProvider'].some(
       (key) => updates[key] !== undefined
     );
 
     if (!hasUpdate) {
       return res.status(400).json({
         error: 'Bad Request',
-        message: 'Provide at least one of text, vision, image, or personality',
+        message: 'Provide at least one of text, vision, image, personality, or searchProvider',
       });
     }
 

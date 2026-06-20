@@ -7,7 +7,7 @@ import ModernConversationOverlay from "./components/ModernConversationOverlay";
 import AudioControls from "./components/AudioControls";
 import ModernUnifiedInput from "./components/ModernUnifiedInput";
 import ModernImageSidebar from "./components/ModernImageSidebar";
-import ModelSelector from "./components/ModelSelector";
+import SettingsPanel from "./components/SettingsPanel";
 import { useConversations } from "./hooks/useConversations";
 import { useSpeech } from "./hooks/useSpeech";
 import { usePasswordProtection } from "./hooks/usePasswordProtection";
@@ -234,7 +234,7 @@ function App() {
       {/* Background Effects - semi-transparent gradient over Matrix image */}
       <div className="absolute inset-0 bg-gradient-to-br from-gray-900/30 via-gray-800/40 to-black/60 pointer-events-none" />
 
-      <ModelSelector
+      <SettingsPanel
         config={config}
         loading={modelsLoading}
         saving={modelsSaving}

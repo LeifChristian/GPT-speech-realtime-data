@@ -1,4 +1,10 @@
 const { DEFAULT_PERSONALITY, listPersonalities, validatePersonality } = require('./personalities');
+const {
+  listSearchProviders,
+  validateSearchProvider,
+  resolveDefaultSearchProvider,
+  getConfiguredSearchProviders,
+} = require('./search');
 
 const MODEL_CATALOG = {
   text: [
@@ -79,6 +85,7 @@ function getDefaultRuntime() {
       model: process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1',
     },
     personality: DEFAULT_PERSONALITY,
+    searchProvider: resolveDefaultSearchProvider(),
   };
 }
 
@@ -131,8 +138,20 @@ function applyRuntimeUpdates(current, updates = {}) {
     validatePersonality(updates.personality);
     next.personality = updates.personality;
   }
+  if (updates.searchProvider !== undefined) {
+    validateSearchProvider(updates.searchProvider);
+    next.searchProvider = updates.searchProvider;
+  }
 
   return next;
+}
+
+function getToolSourceStatus() {
+  return {
+    weather: !!process.env.weatherAPIKey,
+    news: !!(process.env.newsAPIKey || process.env.NEWS_API_KEY || process.env.NEWSDATA_API_KEY),
+    shows: !!process.env.showsAPIKey,
+  };
 }
 
 function getRuntimePayload(active) {
@@ -141,7 +160,10 @@ function getRuntimePayload(active) {
     active,
     available: filterCatalogByProviders(MODEL_CATALOG, configured),
     personalities: listPersonalities(),
+    searchProviders: listSearchProviders(),
+    toolSources: getToolSourceStatus(),
     configuredProviders: configured,
+    configuredSearchProviders: getConfiguredSearchProviders(),
   };
 }
 

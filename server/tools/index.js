@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { runWebSearch } = require('./search');
 
 async function get_population(city) {
   const minPopulation = 1;
@@ -97,77 +98,24 @@ async function get_shows(query) {
   }
 }
 
-async function get_realtime_data(query) {
-  const apiKey = process.env.PERPLEXITY_API_KEY;
-  if (!apiKey) {
-    return 'Error: Perplexity API key is not configured on the server.';
-  }
-
-  try {
-    console.log('[PPLX] live search HIT', { query: String(query || '').slice(0, 160) });
-    const system = [
-      'You are a research assistant with live web access. Perform real-time public web search and aggregate findings.',
-      'Return up to 10 items with EXACTLY this text-only structure per item:',
-      'Name: <title>\\nLink: <https url>\\nSnippet: <concise summary>\\n',
-      'Links are MANDATORY. Keep output concise for TTS.',
-    ].join(' ');
-
-    const model = process.env.PPLX_MODEL || 'sonar-pro';
-    const payload = {
-      model,
-      temperature: 0.2,
-      return_citations: true,
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: String(query || '').slice(0, 4000) },
-      ],
-    };
-
-    const resp = await axios.post('https://api.perplexity.ai/chat/completions', payload, {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      timeout: 20000,
-    });
-
-    let text = resp?.data?.choices?.[0]?.message?.content?.trim();
-    const citations = resp?.data?.citations || resp?.data?.choices?.[0]?.message?.citations || [];
-
-    if (!/https?:\/\//i.test(text || '') && Array.isArray(citations) && citations.length) {
-      const citeBlock = citations
-        .slice(0, 10)
-        .map((u, idx) => {
-          const url = typeof u === 'string' ? u : u?.url || '';
-          if (!url) return '';
-          return `Name: Source ${idx + 1}\nLink: ${url}\nSnippet: See source.\n`;
-        })
-        .filter(Boolean)
-        .join('\n');
-      text = text ? `${text}\n\n${citeBlock}` : citeBlock;
-    }
-
-    return text || 'No results found.';
-  } catch (error) {
-    console.error('[PPLX] Error', error.message);
-    return `Error fetching search results: ${error.response?.status || ''}`.trim();
-  }
+async function get_realtime_data(query, searchProvider = 'brave') {
+  return runWebSearch(query, searchProvider);
 }
 
 const TOOL_EXECUTORS = {
   get_current_weather: (args) => get_current_weather(args),
   get_population: (args) => get_population(args.city),
-  get_realtime_data: (args) => get_realtime_data(args.query),
+  get_realtime_data: (args, ctx) => get_realtime_data(args.query, ctx?.searchProvider),
   get_news: (args) => get_news(args.query),
   get_shows: (args) => get_shows(args.query),
 };
 
-async function executeTool(name, args = {}) {
+async function executeTool(name, args = {}, context = {}) {
   const handler = TOOL_EXECUTORS[name];
   if (!handler) {
     return `Unsupported tool: ${name}`;
   }
-  const result = await handler(args);
+  const result = await handler(args, context);
   if (typeof result === 'string') return result;
   return JSON.stringify(result ?? '');
 }
