@@ -7,9 +7,11 @@ import ModernConversationOverlay from "./components/ModernConversationOverlay";
 import AudioControls from "./components/AudioControls";
 import ModernUnifiedInput from "./components/ModernUnifiedInput";
 import ModernImageSidebar from "./components/ModernImageSidebar";
+import ModelSelector from "./components/ModelSelector";
 import { useConversations } from "./hooks/useConversations";
 import { useSpeech } from "./hooks/useSpeech";
 import { usePasswordProtection } from "./hooks/usePasswordProtection";
+import { useModels } from "./hooks/useModels";
 import { Button } from "./components/ui/Button";
 import { apiUrl } from "./utils/api";
 
@@ -28,6 +30,7 @@ function App() {
   const [currentConversationName, setCurrentConversationName] = useState('');
   const [isImageSidebarOpen, setIsImageSidebarOpen] = useState(false);
   const responseRef = useRef(null);
+  const { models, loading: modelsLoading, saving: modelsSaving, error: modelsError, updateModels } = useModels();
 
   // Speech controls are initialized after we get handleGreeting from conversations
 
@@ -81,6 +84,16 @@ function App() {
 
   const downloadCurrentImage = async (url) => {
     try {
+      if (String(url).startsWith('data:')) {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `generated-image-${Date.now()}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        return;
+      }
+
       const response = await fetch(apiUrl(`image/download?url=${encodeURIComponent(url)}`));
       if (!response.ok) throw new Error('Proxy download failed');
       const blob = await response.blob();
@@ -220,6 +233,14 @@ function App() {
     <div className="min-h-screen relative overflow-x-hidden">
       {/* Background Effects - semi-transparent gradient over Matrix image */}
       <div className="absolute inset-0 bg-gradient-to-br from-gray-900/30 via-gray-800/40 to-black/60 pointer-events-none" />
+
+      <ModelSelector
+        models={models}
+        loading={modelsLoading}
+        saving={modelsSaving}
+        error={modelsError}
+        onChange={updateModels}
+      />
 
       {/* Toggle Conversation History Button (top-right, offset when image sidebar present) */}
       <motion.div className="fixed top-4 right-4 z-[60]" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
