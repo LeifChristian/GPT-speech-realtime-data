@@ -1,11 +1,29 @@
 import { apiUrl } from '../utils/api';
 import React, { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, MessageSquare, User, Bot, ImagePlus, Send, Square, Play, Pause } from 'lucide-react';
+import { X, MessageSquare, User, Bot, ImagePlus, Send, Square, Play, Pause, Mic } from 'lucide-react';
 import { Button } from './ui/Button';
 import { GlassCard } from './ui/Card';
+import VoiceVisualizer from './VoiceVisualizer';
 
-const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, handleResponse, appendQuestionToHistory, appendResponseToHistory, thumbnails = [], addThumbnail, speakText, updateMainResponse }) => {
+const ModernConversationOverlay = ({
+    conversation,
+    onClose,
+    handleGreeting,
+    handleResponse,
+    appendQuestionToHistory,
+    appendResponseToHistory,
+    thumbnails = [],
+    addThumbnail,
+    speakText,
+    updateMainResponse,
+    voiceModeActive = false,
+    voiceStatus = 'idle',
+    frequencyData = null,
+    interimTranscript = '',
+    startVoiceMode,
+    stopVoiceMode,
+}) => {
     // Local input state (must be declared before any conditional returns)
     const [inputText, setInputText] = useState('');
     const [dragActive, setDragActive] = useState(false);
@@ -162,8 +180,10 @@ const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, hand
     const localHandleResponse = (content, isTemp = false) => {
         const msgId = Date.now();
         setMessages(prev => [...prev, { id: msgId, role: isTemp ? 'temp' : 'assistant', content, isTemp }]);
-        if (!isTemp) {
+        if (!isTemp && speakText) {
             speakText(content);
+        } else if (isTemp && speakText) {
+            speakText(content, { skipRelisten: true });
         }
     };
 
@@ -197,13 +217,9 @@ const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, hand
             appendQuestionToHistory(prompt ? `Question about image: ${prompt}` : 'Analyze image');
             appendResponseToHistory(responseData.content);
 
-            // Speak if needed
-            if (speakText) speakText(responseData.content); // Assuming it's optional or check if not already speaking
-
             // Add to analyzed images
-            const msgId = Date.now(); // Generate a unique ID for the response
-            setMessages(prev => [...prev, { id: msgId, role: 'assistant', content: responseData.content }]);
-            setAnalyzedImages(prev => [...prev, { id: msgId, url: fileURL, prompt }]); // Use the message id
+            const msgId = Date.now();
+            setAnalyzedImages(prev => [...prev, { id: msgId, url: fileURL, prompt }]);
             updateMainResponse(responseData.content);
 
             return responseData;
@@ -373,8 +389,25 @@ const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, hand
 
                     {/* Footer: controls + stacked input with auto-grow and send below */}
                     <form onSubmit={handleSubmit} className="p-6 border-t border-white/10 space-y-2">
-                        <div className="flex items-center justify-end gap-2">
-                            <Button type="button" variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={() => { window.speechSynthesis.cancel(); setIsSpeaking(false); }} title="Stop speech" aria-label="Stop speech">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-2">
+                                {typeof startVoiceMode === 'function' && (
+                                    <Button
+                                        type="button"
+                                        variant={voiceModeActive ? 'default' : 'ghost'}
+                                        size="sm"
+                                        className={voiceModeActive ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'text-white hover:bg-white/10'}
+                                        onClick={() => (voiceModeActive ? stopVoiceMode?.() : startVoiceMode())}
+                                        title={voiceModeActive ? 'Exit voice mode' : 'Start voice mode'}
+                                        aria-pressed={voiceModeActive}
+                                    >
+                                        <Mic className="h-4 w-4 mr-1" />
+                                        {voiceModeActive ? 'Voice On' : 'Voice'}
+                                    </Button>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                            <Button type="button" variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={() => { window.speechSynthesis.cancel(); setIsSpeaking(false); if (stopVoiceMode && voiceModeActive) stopVoiceMode(); }} title="Stop speech" aria-label="Stop speech">
                                 <Square className="h-5 w-5" />
                             </Button>
                             <Button type="button" variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={() => {
@@ -394,7 +427,16 @@ const ModernConversationOverlay = ({ conversation, onClose, handleGreeting, hand
                             >
                                 <ImagePlus className="h-5 w-5" />
                             </Button>
+                            </div>
                         </div>
+                        {voiceModeActive && (
+                            <VoiceVisualizer
+                                frequencyData={frequencyData}
+                                isActive={voiceModeActive}
+                                status={voiceStatus}
+                                interimTranscript={interimTranscript}
+                            />
+                        )}
                         <div
                             className={`bg-gray-800/50 rounded-xl p-2 border ${dragActive ? 'border-blue-400' : 'border-white/10'}`}
                             onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setDragActive(true); }}

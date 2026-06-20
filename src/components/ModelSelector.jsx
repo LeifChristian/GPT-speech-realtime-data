@@ -44,11 +44,11 @@ const ModelSelector = ({ models, loading, saving, error, onChange }) => {
   const collapsedHint = chatLabel ? `Models · ${chatLabel}` : 'Models';
 
   return (
-    <div className="w-full max-w-md mx-auto mb-3 px-3 sm:px-4 relative z-20">
-      <GlassCard className="overflow-hidden shadow-lg shadow-black/20">
+    <div className="w-full max-w-md mx-auto mb-3 px-3 sm:px-4 relative z-50">
+      <GlassCard className="relative shadow-lg shadow-black/20 overflow-visible isolate">
         <button
           type="button"
-          className="flex w-full items-center justify-between gap-2 px-3 sm:px-4 py-2.5 text-white hover:bg-white/5 transition-colors"
+          className="flex w-full items-center justify-between gap-2 px-3 sm:px-4 py-2.5 text-white hover:bg-white/5 transition-colors rounded-xl"
           onClick={() => setCollapsed((v) => !v)}
           aria-expanded={!collapsed}
           aria-controls="model-selector-content"
@@ -73,14 +73,14 @@ const ModelSelector = ({ models, loading, saving, error, onChange }) => {
           {!collapsed && (
             <motion.div
               id="model-selector-content"
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2, ease: 'easeInOut' }}
-              className="overflow-hidden"
+              initial={{ opacity: 0, y: -6, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -6, scale: 0.98 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+              className="absolute left-0 right-0 top-full mt-1 z-[60] rounded-xl border border-white/15 bg-gray-900/95 backdrop-blur-xl shadow-2xl shadow-black/50"
             >
-              <div className="px-3 sm:px-4 pb-4 pt-1 border-t border-white/10 max-h-[min(50vh,320px)] overflow-y-auto">
-                <div className="space-y-3 mt-2">
+              <div className="px-3 sm:px-4 pb-4 pt-3 max-h-[min(50vh,320px)] overflow-y-auto">
+                <div className="space-y-3">
                   {sections.map(({ key, label, options }) => (
                     <label key={key} className="block">
                       <span className="text-xs uppercase tracking-wide text-white/60">{label}</span>

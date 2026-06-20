@@ -49,6 +49,15 @@ app.use('/image', imageRouter);
 app.use('/chat', chatRouter);
 app.use('/file', fileRouter);
 
+// Dev-only: helpful message if you open the API port in a browser
+if (process.env.NODE_ENV !== 'production') {
+  app.get('/', (req, res) => {
+    res.type('text/plain').send(
+      'Omnibot API (dev)\n\nUse the React app at http://localhost:3000\nAPI routes: /chat, /image, /models, /file'
+    );
+  });
+}
+
 // Serve frontend build in production and support SPA routing
 if (process.env.NODE_ENV === 'production') {
   const clientBuildPath = path.join(__dirname, '..', 'build');

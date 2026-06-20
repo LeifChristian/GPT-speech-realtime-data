@@ -86,7 +86,6 @@ h1 {
 
 /* Button styling */
 .button {
-  z-index: 3000;
   background: transparent;
   color: lightgrey;
   text-shadow: -12px -2px 8px #c634eb;
@@ -97,6 +96,8 @@ h1 {
   font-size: 1em;
   cursor: pointer;
   transition: background-color 0.3s;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .button2 {
@@ -130,13 +131,15 @@ textarea {
 
 /* Buttons container */
 .buttons-container {
-  z-index: 3000;
-  margin-top: 17%;
+  position: relative;
+  z-index: 1;
+  margin-top: 0;
   display: flex;
-  justify-content: center; /* Centers the buttons horizontally */
+  flex-wrap: nowrap;
+  justify-content: center;
   align-items: center;
   padding: 2%;
-  gap: 10px; /* Adds space between buttons */
+  gap: 10px;
 }
 
 ::-webkit-scrollbar {
