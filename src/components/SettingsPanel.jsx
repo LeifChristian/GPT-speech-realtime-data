@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
-import { Settings2, Sparkles, ChevronDown, ChevronUp, Globe, Wrench } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Settings2, Sparkles, ChevronDown, Globe, Wrench } from 'lucide-react';
 import { GlassCard } from './ui/Card';
 
 function slotValue(slot) {
@@ -13,19 +14,31 @@ function formatOptionLabel(option) {
   return `${option.label} (${provider})`;
 }
 
+function getSlotLabel(config, key) {
+  const slot = config?.active?.[key];
+  if (!slot) return null;
+  const options = config?.available?.[key] || [];
+  const match = options.find(
+    (o) => o.provider === slot.provider && o.model === slot.model
+  );
+  return match?.label || slot.model;
+}
+
 const selectClass =
   'mt-1 w-full rounded-md border border-white/20 bg-black/30 px-2 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-400/50';
 
 const sectionLabelClass = 'text-xs uppercase tracking-wide text-white/60';
 
 const SettingsPanel = ({ config, loading, saving, error, onChange }) => {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
   if (loading && !config) {
     return (
-      <GlassCard className="fixed top-4 left-4 z-[60] p-3 text-white/70 text-sm">
-        Loading settings...
-      </GlassCard>
+      <div className="w-full max-w-md mx-auto mb-3 px-3 sm:px-4">
+        <GlassCard className="p-3 text-white/70 text-sm text-center">
+          Loading settings...
+        </GlassCard>
+      </div>
     );
   }
 
@@ -58,128 +71,151 @@ const SettingsPanel = ({ config, loading, saving, error, onChange }) => {
   const activePersonality = config.personalities?.find((p) => p.id === config.active.personality);
   const activeSearch = config.searchProviders?.find((p) => p.id === config.active.searchProvider);
 
+  const chatLabel = getSlotLabel(config, 'text');
+  const collapsedHint = [activePersonality?.label, chatLabel].filter(Boolean).join(' · ');
+
   return (
-    <GlassCard className="fixed top-4 left-4 z-[60] p-3 w-[min(92vw,340px)] max-h-[85vh] overflow-y-auto">
-      <button
-        type="button"
-        className="flex w-full items-center justify-between gap-2 mb-2 text-white"
-        onClick={() => setCollapsed((v) => !v)}
-      >
-        <span className="flex items-center gap-2 text-sm font-medium">
-          <Settings2 className="h-4 w-4" />
-          Settings
-          {saving && <span className="text-xs text-white/60 font-normal">Saving...</span>}
-        </span>
-        {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-      </button>
-
-      {!collapsed && (
-        <>
-          {/* Agent personality */}
-          <label className="block mb-4">
-            <span className={`${sectionLabelClass} flex items-center gap-1`}>
-              <Sparkles className="h-3 w-3" /> Personality
+    <div className="w-full max-w-md mx-auto mb-3 px-3 sm:px-4 relative z-20">
+      <GlassCard className="overflow-hidden shadow-lg shadow-black/20">
+        <button
+          type="button"
+          className="flex w-full items-center justify-between gap-2 px-3 sm:px-4 py-2.5 text-white hover:bg-white/5 transition-colors"
+          onClick={() => setCollapsed((v) => !v)}
+          aria-expanded={!collapsed}
+          aria-controls="settings-panel-content"
+        >
+          <span className="flex min-w-0 items-center gap-2 text-sm font-medium">
+            <Settings2 className="h-4 w-4 shrink-0" />
+            <span className="truncate">
+              {collapsed ? (collapsedHint || 'Settings') : 'Settings'}
             </span>
-            <select
-              className={`${selectClass} focus:ring-purple-400/50`}
-              value={config.active.personality || 'default'}
-              disabled={saving}
-              onChange={(e) => handlePersonalityChange(e.target.value)}
-            >
-              {(config.personalities || []).map((p) => (
-                <option key={p.id} value={p.id} className="text-black">
-                  {p.label}
-                </option>
-              ))}
-            </select>
-            {activePersonality?.description && (
-              <p className="mt-1 text-xs text-white/50">{activePersonality.description}</p>
+            {saving && (
+              <span className="text-xs text-white/60 font-normal shrink-0">Saving...</span>
             )}
-          </label>
+          </span>
+          <ChevronDown
+            className={`h-4 w-4 shrink-0 text-white/70 transition-transform duration-200 ${
+              collapsed ? '' : 'rotate-180'
+            }`}
+          />
+        </button>
 
-          {/* LLM models */}
-          <p className={`${sectionLabelClass} mb-2`}>Models</p>
-          <div className="space-y-3 mb-4">
-            {modelSections.map(({ key, label, options }) => (
-              <label key={key} className="block">
-                <span className={sectionLabelClass}>{label}</span>
-                <select
-                  className={selectClass}
-                  value={slotValue(config.active[key])}
-                  disabled={saving || options.length === 0}
-                  onChange={(e) => handleModelChange(key, e.target.value)}
-                >
-                  {options.length === 0 ? (
-                    <option value="">No models — add API key</option>
-                  ) : (
-                    options.map((option) => (
-                      <option
-                        key={`${option.provider}:${option.model}`}
-                        value={`${option.provider}:${option.model}`}
-                        className="text-black"
-                      >
-                        {formatOptionLabel(option)}
+        <AnimatePresence initial={false}>
+          {!collapsed && (
+            <motion.div
+              id="settings-panel-content"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2, ease: 'easeInOut' }}
+              className="overflow-hidden"
+            >
+              <div className="px-3 sm:px-4 pb-4 pt-1 border-t border-white/10 max-h-[min(50vh,420px)] overflow-y-auto">
+                <label className="block mb-4 mt-2">
+                  <span className={`${sectionLabelClass} flex items-center gap-1`}>
+                    <Sparkles className="h-3 w-3" /> Personality
+                  </span>
+                  <select
+                    className={`${selectClass} focus:ring-purple-400/50`}
+                    value={config.active.personality || 'default'}
+                    disabled={saving}
+                    onChange={(e) => handlePersonalityChange(e.target.value)}
+                  >
+                    {(config.personalities || []).map((p) => (
+                      <option key={p.id} value={p.id} className="text-black">
+                        {p.label}
                       </option>
-                    ))
+                    ))}
+                  </select>
+                  {activePersonality?.description && (
+                    <p className="mt-1 text-xs text-white/50">{activePersonality.description}</p>
                   )}
-                </select>
-              </label>
-            ))}
-          </div>
+                </label>
 
-          {/* Data / tool sources */}
-          <p className={`${sectionLabelClass} mb-2 flex items-center gap-1`}>
-            <Globe className="h-3 w-3" /> Web search
-          </p>
-          <label className="block mb-4">
-            <select
-              className={selectClass}
-              value={config.active.searchProvider || 'brave'}
-              disabled={saving || searchOptions.length === 0}
-              onChange={(e) => handleSearchProviderChange(e.target.value)}
-            >
-              {searchOptions.length === 0 ? (
-                <option value="">No search API — add BRAVE_API_KEY or PERPLEXITY_API_KEY</option>
-              ) : (
-                searchOptions.map((p) => (
-                  <option key={p.id} value={p.id} className="text-black">
-                    {p.label}
-                  </option>
-                ))
-              )}
-            </select>
-            {activeSearch?.description && (
-              <p className="mt-1 text-xs text-white/50">{activeSearch.description}</p>
-            )}
-          </label>
+                <p className={`${sectionLabelClass} mb-2`}>Models</p>
+                <div className="space-y-3 mb-4">
+                  {modelSections.map(({ key, label, options }) => (
+                    <label key={key} className="block">
+                      <span className={sectionLabelClass}>{label}</span>
+                      <select
+                        className={selectClass}
+                        value={slotValue(config.active[key])}
+                        disabled={saving || options.length === 0}
+                        onChange={(e) => handleModelChange(key, e.target.value)}
+                      >
+                        {options.length === 0 ? (
+                          <option value="">No models — add API key</option>
+                        ) : (
+                          options.map((option) => (
+                            <option
+                              key={`${option.provider}:${option.model}`}
+                              value={`${option.provider}:${option.model}`}
+                              className="text-black"
+                            >
+                              {formatOptionLabel(option)}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </label>
+                  ))}
+                </div>
 
-          {config.toolSources && (
-            <>
-              <p className={`${sectionLabelClass} mb-2 flex items-center gap-1`}>
-                <Wrench className="h-3 w-3" /> Tool APIs (env keys)
-              </p>
-              <ul className="text-xs text-white/50 space-y-1 mb-3">
-                <li>Weather: {config.toolSources.weather ? '✓ configured' : '○ weatherAPIKey'}</li>
-                <li>News: {config.toolSources.news ? '✓ NewsData.io' : '○ newsAPIKey'}</li>
-                <li>Streaming: {config.toolSources.shows ? '✓ RapidAPI' : '○ showsAPIKey'}</li>
-              </ul>
-            </>
+                <p className={`${sectionLabelClass} mb-2 flex items-center gap-1`}>
+                  <Globe className="h-3 w-3" /> Web search
+                </p>
+                <label className="block mb-4">
+                  <select
+                    className={selectClass}
+                    value={config.active.searchProvider || 'brave'}
+                    disabled={saving || searchOptions.length === 0}
+                    onChange={(e) => handleSearchProviderChange(e.target.value)}
+                  >
+                    {searchOptions.length === 0 ? (
+                      <option value="">No search API — add BRAVE_API_KEY or PERPLEXITY_API_KEY</option>
+                    ) : (
+                      searchOptions.map((p) => (
+                        <option key={p.id} value={p.id} className="text-black">
+                          {p.label}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                  {activeSearch?.description && (
+                    <p className="mt-1 text-xs text-white/50">{activeSearch.description}</p>
+                  )}
+                </label>
+
+                {config.toolSources && (
+                  <>
+                    <p className={`${sectionLabelClass} mb-2 flex items-center gap-1`}>
+                      <Wrench className="h-3 w-3" /> Tool APIs (env keys)
+                    </p>
+                    <ul className="text-xs text-white/50 space-y-1 mb-3">
+                      <li>Weather: {config.toolSources.weather ? '✓ configured' : '○ weatherAPIKey'}</li>
+                      <li>News: {config.toolSources.news ? '✓ NewsData.io' : '○ newsAPIKey'}</li>
+                      <li>Streaming: {config.toolSources.shows ? '✓ RapidAPI' : '○ showsAPIKey'}</li>
+                    </ul>
+                  </>
+                )}
+
+                {config.configuredProviders && (
+                  <p className="text-[10px] text-white/40 uppercase tracking-wide">
+                    LLM providers:{' '}
+                    {Object.entries(config.configuredProviders)
+                      .filter(([, ok]) => ok)
+                      .map(([name]) => name)
+                      .join(', ') || 'none'}
+                  </p>
+                )}
+
+                {error && <p className="mt-2 text-xs text-red-300">{error}</p>}
+              </div>
+            </motion.div>
           )}
-
-          {config.configuredProviders && (
-            <p className="text-[10px] text-white/40 uppercase tracking-wide">
-              LLM providers:{' '}
-              {Object.entries(config.configuredProviders)
-                .filter(([, ok]) => ok)
-                .map(([name]) => name)
-                .join(', ') || 'none'}
-            </p>
-          )}
-
-          {error && <p className="mt-2 text-xs text-red-300">{error}</p>}
-        </>
-      )}
-    </GlassCard>
+        </AnimatePresence>
+      </GlassCard>
+    </div>
   );
 };
 
