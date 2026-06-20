@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useMicAnalyser } from './useMicAnalyser';
 
 const RELISTEN_DELAY_MS = 750;
+const SKIP_TO_LISTEN_DELAY_MS = 200;
 
 export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
   const [isRecording, setIsRecording] = useState(false);
@@ -20,6 +21,7 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
   const awaitingTtsRef = useRef(false);
   const relistenTimerRef = useRef(null);
   const handleGreetingRef = useRef(handleGreeting);
+  const speechSessionRef = useRef(0);
 
   const { frequencyData, isMicActive, startMic, stopMic } = useMicAnalyser();
 
@@ -33,18 +35,6 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
       relistenTimerRef.current = null;
     }
   }, []);
-
-  const scheduleRelisten = useCallback(() => {
-    clearRelistenTimer();
-    if (!voiceModeRef.current) return;
-
-    relistenTimerRef.current = setTimeout(() => {
-      relistenTimerRef.current = null;
-      if (!voiceModeRef.current || isProcessingRef.current || awaitingTtsRef.current) return;
-      if (typeof window !== 'undefined' && window.speechSynthesis?.speaking) return;
-      startListeningInternal();
-    }, RELISTEN_DELAY_MS);
-  }, [clearRelistenTimer]);
 
   const startListeningInternal = useCallback(() => {
     const rec = recognitionRef.current;
@@ -60,7 +50,6 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
     try {
       rec.start();
     } catch (err) {
-      // Already started — ignore InvalidStateError
       if (err?.name !== 'InvalidStateError') {
         console.error('Speech recognition start failed:', err);
       }
@@ -77,6 +66,26 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
       }
     }
   }, []);
+
+  /** Invalidate queued TTS segments and stop current utterance */
+  const cancelActiveSpeech = useCallback(() => {
+    speechSessionRef.current += 1;
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      speechSynthesis.cancel();
+    }
+  }, []);
+
+  const scheduleRelisten = useCallback((delayMs = RELISTEN_DELAY_MS) => {
+    clearRelistenTimer();
+    if (!voiceModeRef.current) return;
+
+    relistenTimerRef.current = setTimeout(() => {
+      relistenTimerRef.current = null;
+      if (!voiceModeRef.current || isProcessingRef.current || awaitingTtsRef.current) return;
+      if (typeof window !== 'undefined' && window.speechSynthesis?.speaking) return;
+      startListeningInternal();
+    }, delayMs);
+  }, [clearRelistenTimer, startListeningInternal]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -185,13 +194,11 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
     clearRelistenTimer();
     stopListeningInternal();
     stopMic();
-    if (typeof window !== 'undefined' && window.speechSynthesis?.speaking) {
-      window.speechSynthesis.cancel();
-    }
+    cancelActiveSpeech();
     setIsPlaying(false);
     setShowPlayPause(false);
     setInterimTranscript('');
-  }, [clearRelistenTimer, stopListeningInternal, stopMic]);
+  }, [clearRelistenTimer, stopListeningInternal, stopMic, cancelActiveSpeech]);
 
   const startVoiceMode = useCallback(async () => {
     if (!recognitionRef.current) {
@@ -199,9 +206,7 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
       return;
     }
 
-    if (typeof window !== 'undefined' && window.speechSynthesis?.speaking) {
-      window.speechSynthesis.cancel();
-    }
+    cancelActiveSpeech();
 
     const micOk = await startMic();
     if (!micOk) {
@@ -212,7 +217,7 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
     voiceModeRef.current = true;
     setVoiceModeActive(true);
     startListeningInternal();
-  }, [startMic, startListeningInternal]);
+  }, [startMic, startListeningInternal, cancelActiveSpeech]);
 
   const toggleVoiceMode = useCallback(() => {
     if (voiceModeRef.current) {
@@ -280,9 +285,8 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
       return;
     }
 
-    if (window.speechSynthesis.speaking) {
-      window.speechSynthesis.cancel();
-    }
+    cancelActiveSpeech();
+    const sessionId = speechSessionRef.current;
 
     const splitTextIntoSegments = (input) => {
       const maxWordsPerSegment = 32;
@@ -316,7 +320,11 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
 
     const segments = splitTextIntoSegments(cleaned);
 
+    const isSessionActive = () => sessionId === speechSessionRef.current;
+
     const synthesizeSegments = () => {
+      if (!isSessionActive()) return;
+
       if (segments.length === 0) {
         onSpeechComplete(options);
         return;
@@ -340,8 +348,16 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
       if (preferred) utterance.voice = preferred;
       utterance.rate = 1.0;
 
-      utterance.onend = synthesizeSegments;
-      utterance.onerror = () => synthesizeSegments();
+      utterance.onend = () => {
+        if (!isSessionActive()) return;
+        synthesizeSegments();
+      };
+      utterance.onerror = (event) => {
+        if (!isSessionActive()) return;
+        // cancel()/interrupt should not advance to the next queued segment
+        if (event?.error === 'interrupted' || event?.error === 'canceled') return;
+        synthesizeSegments();
+      };
 
       speechSynthesis.speak(utterance);
       setIsPlaying(true);
@@ -349,18 +365,17 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
 
     if (speechSynthesis.getVoices().length === 0) {
       speechSynthesis.onvoiceschanged = () => {
+        if (!isSessionActive()) return;
         synthesizeSegments();
         speechSynthesis.onvoiceschanged = null;
       };
     } else {
       synthesizeSegments();
     }
-  }, [onSpeechComplete, stopListeningInternal, toggle]);
+  }, [onSpeechComplete, stopListeningInternal, toggle, cancelActiveSpeech]);
 
   const stopSpeakText = useCallback(() => {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      speechSynthesis.cancel();
-    }
+    cancelActiveSpeech();
     awaitingTtsRef.current = false;
     setIsPlaying(false);
     setShowPlayPause(false);
@@ -368,19 +383,31 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
       setVoiceStatus('listening');
       scheduleRelisten();
     }
-  }, [scheduleRelisten]);
+  }, [scheduleRelisten, cancelActiveSpeech]);
+
+  /** End TTS immediately and resume listening — stays in voice mode */
+  const skipSpeechAndListen = useCallback(() => {
+    if (!voiceModeRef.current || isProcessingRef.current) return;
+    clearRelistenTimer();
+    cancelActiveSpeech();
+    awaitingTtsRef.current = false;
+    setIsPlaying(false);
+    setShowPlayPause(false);
+    setVoiceStatus('listening');
+    scheduleRelisten(SKIP_TO_LISTEN_DELAY_MS);
+  }, [clearRelistenTimer, scheduleRelisten, cancelActiveSpeech]);
 
   const toggleMute = useCallback(() => {
     setToggle((prev) => !prev);
     if (typeof window !== 'undefined' && window.speechSynthesis?.speaking) {
-      speechSynthesis.cancel();
+      cancelActiveSpeech();
       awaitingTtsRef.current = false;
       if (voiceModeRef.current) {
         setVoiceStatus('listening');
         scheduleRelisten();
       }
     }
-  }, [scheduleRelisten]);
+  }, [scheduleRelisten, cancelActiveSpeech]);
 
   const pause = useCallback(() => {
     if (isPlaying) {
@@ -425,6 +452,7 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText) => {
     showPlayPause,
     speakText,
     stopSpeakText,
+    skipSpeechAndListen,
     toggleMute,
     pause,
     finalTranscript,

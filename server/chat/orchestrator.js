@@ -1,6 +1,6 @@
 const { TOOL_DEFINITIONS } = require('../tools/definitions');
 const { executeTool } = require('../tools');
-const { buildSystemPrompt } = require('../config/personalities');
+const { buildSystemPrompt, getPersonalityTemperature } = require('../config/personalities');
 const { complete, completeSimple } = require('../providers');
 
 const MAX_TOOL_ROUNDS = 3;
@@ -14,6 +14,7 @@ async function runChatWithTools({
   maxRounds = MAX_TOOL_ROUNDS,
 }) {
   const system = buildSystemPrompt(personalityId);
+  const temperature = getPersonalityTemperature(personalityId);
   const messages = [{ role: 'user', content: userMessage }];
   const toolContext = { searchProvider };
 
@@ -24,6 +25,7 @@ async function runChatWithTools({
       messages,
       system,
       tools: TOOL_DEFINITIONS,
+      temperature,
     });
 
     if (!result.toolCalls?.length) {
@@ -49,6 +51,7 @@ async function runChatWithTools({
     model,
     messages,
     system,
+    temperature,
   });
   return final.text || '';
 }
