@@ -1,75 +1,178 @@
+const { DEFAULT_PERSONALITY, listPersonalities, validatePersonality } = require('./personalities');
+const {
+  listSearchProviders,
+  validateSearchProvider,
+  resolveDefaultSearchProvider,
+  getConfiguredSearchProviders,
+} = require('./search');
+
 const MODEL_CATALOG = {
   text: [
-    { id: 'gpt-4o-mini', label: 'GPT-4o Mini', description: 'Fast, low-cost chat' },
-    { id: 'gpt-4o', label: 'GPT-4o', description: 'Stronger general chat' },
-    { id: 'gpt-4.1-mini', label: 'GPT-4.1 Mini', description: 'Newer efficient chat' },
-    { id: 'gpt-4.1', label: 'GPT-4.1', description: 'Newer flagship chat' },
+    { provider: 'openai', model: 'gpt-4o-mini', label: 'GPT-4o Mini', supportsTools: true },
+    { provider: 'openai', model: 'gpt-4o', label: 'GPT-4o', supportsTools: true },
+    { provider: 'openai', model: 'gpt-4.1-mini', label: 'GPT-4.1 Mini', supportsTools: true },
+    { provider: 'openai', model: 'gpt-4.1', label: 'GPT-4.1', supportsTools: true },
+    { provider: 'anthropic', model: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4', supportsTools: true },
+    { provider: 'anthropic', model: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku', supportsTools: true },
+    { provider: 'xai', model: 'grok-3-mini', label: 'Grok 3 Mini', supportsTools: true },
+    { provider: 'xai', model: 'grok-3', label: 'Grok 3', supportsTools: true },
+    { provider: 'groq', model: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B', supportsTools: true },
+    { provider: 'groq', model: 'mixtral-8x7b-32768', label: 'Mixtral 8x7B', supportsTools: true },
   ],
   vision: [
-    { id: 'gpt-4o', label: 'GPT-4o', description: 'Vision analysis' },
-    { id: 'gpt-4o-mini', label: 'GPT-4o Mini', description: 'Faster vision analysis' },
-    { id: 'gpt-4.1-mini', label: 'GPT-4.1 Mini', description: 'Newer vision analysis' },
+    { provider: 'openai', model: 'gpt-4o', label: 'GPT-4o Vision' },
+    { provider: 'openai', model: 'gpt-4o-mini', label: 'GPT-4o Mini Vision' },
+    { provider: 'anthropic', model: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4 Vision' },
+    { provider: 'xai', model: 'grok-2-vision-1212', label: 'Grok 2 Vision' },
   ],
   image: [
-    { id: 'gpt-image-1', label: 'GPT Image 1', description: 'Default image generation (replaces DALL·E 3)' },
-    { id: 'gpt-image-1-mini', label: 'GPT Image 1 Mini', description: 'Faster, cheaper images' },
-    { id: 'gpt-image-1.5', label: 'GPT Image 1.5', description: 'Higher quality images' },
+    { provider: 'openai', model: 'gpt-image-1', label: 'GPT Image 1' },
+    { provider: 'openai', model: 'gpt-image-1-mini', label: 'GPT Image 1 Mini' },
+    { provider: 'openai', model: 'gpt-image-1.5', label: 'GPT Image 1.5' },
   ],
 };
 
-const DEFAULTS = {
-  textModel: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-  visionModel: process.env.OPENAI_VISION_MODEL || 'gpt-4o',
-  imageModel: process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1',
-};
-
-const allowedIds = {
-  text: new Set(MODEL_CATALOG.text.map((m) => m.id)),
-  vision: new Set(MODEL_CATALOG.vision.map((m) => m.id)),
-  image: new Set(MODEL_CATALOG.image.map((m) => m.id)),
-};
-
-function getDefaultModels() {
-  return { ...DEFAULTS };
+function slotKey(slot) {
+  return `${slot.provider}:${slot.model}`;
 }
 
-function validateModel(category, modelId) {
-  const allowed = allowedIds[category];
-  if (!allowed || !allowed.has(modelId)) {
-    const options = MODEL_CATALOG[category].map((m) => m.id).join(', ');
-    throw new Error(`Invalid ${category} model "${modelId}". Allowed: ${options}`);
+function parseSlotKey(key) {
+  const idx = key.indexOf(':');
+  if (idx === -1) {
+    throw new Error(`Invalid model key "${key}". Expected provider:model`);
+  }
+  return {
+    provider: key.slice(0, idx),
+    model: key.slice(idx + 1),
+  };
+}
+
+function getConfiguredProviders() {
+  return {
+    openai: !!(process.env.OPENAI_API_KEY || process.env.openAPIKey),
+    anthropic: !!process.env.ANTHROPIC_API_KEY,
+    xai: !!process.env.XAI_API_KEY,
+    groq: !!process.env.GROQ_API_KEY,
+  };
+}
+
+function filterCatalogByProviders(catalog, configured) {
+  const filtered = {};
+  for (const [category, entries] of Object.entries(catalog)) {
+    filtered[category] = entries.filter((entry) => configured[entry.provider]);
+  }
+  return filtered;
+}
+
+function findCatalogEntry(category, provider, model) {
+  return MODEL_CATALOG[category]?.find(
+    (entry) => entry.provider === provider && entry.model === model
+  );
+}
+
+function getDefaultRuntime() {
+  return {
+    text: {
+      provider: 'openai',
+      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+    },
+    vision: {
+      provider: 'openai',
+      model: process.env.OPENAI_VISION_MODEL || 'gpt-4o',
+    },
+    image: {
+      provider: 'openai',
+      model: process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1',
+    },
+    personality: DEFAULT_PERSONALITY,
+    searchProvider: resolveDefaultSearchProvider(),
+  };
+}
+
+function normalizeSlot(value, category) {
+  if (!value) return null;
+  if (typeof value === 'string') {
+    return parseSlotKey(value);
+  }
+  if (value.provider && value.model) {
+    return { provider: value.provider, model: value.model };
+  }
+  throw new Error(`Invalid ${category} model value`);
+}
+
+function validateSlot(category, slot) {
+  const configured = getConfiguredProviders();
+  if (!configured[slot.provider]) {
+    throw new Error(
+      `Provider "${slot.provider}" is not configured. Set the corresponding API key in the environment.`
+    );
+  }
+  if (!findCatalogEntry(category, slot.provider, slot.model)) {
+    const options = MODEL_CATALOG[category]
+      .filter((e) => configured[e.provider])
+      .map((e) => slotKey(e))
+      .join(', ');
+    throw new Error(`Invalid ${category} model "${slotKey(slot)}". Allowed: ${options}`);
   }
 }
 
-function applyModelUpdates(current, updates = {}) {
+function applyRuntimeUpdates(current, updates = {}) {
   const next = { ...current };
 
-  if (updates.textModel !== undefined) {
-    validateModel('text', updates.textModel);
-    next.textModel = updates.textModel;
+  if (updates.text !== undefined) {
+    const slot = normalizeSlot(updates.text, 'text');
+    validateSlot('text', slot);
+    next.text = slot;
   }
-  if (updates.visionModel !== undefined) {
-    validateModel('vision', updates.visionModel);
-    next.visionModel = updates.visionModel;
+  if (updates.vision !== undefined) {
+    const slot = normalizeSlot(updates.vision, 'vision');
+    validateSlot('vision', slot);
+    next.vision = slot;
   }
-  if (updates.imageModel !== undefined) {
-    validateModel('image', updates.imageModel);
-    next.imageModel = updates.imageModel;
+  if (updates.image !== undefined) {
+    const slot = normalizeSlot(updates.image, 'image');
+    validateSlot('image', slot);
+    next.image = slot;
+  }
+  if (updates.personality !== undefined) {
+    validatePersonality(updates.personality);
+    next.personality = updates.personality;
+  }
+  if (updates.searchProvider !== undefined) {
+    validateSearchProvider(updates.searchProvider);
+    next.searchProvider = updates.searchProvider;
   }
 
   return next;
 }
 
-function getModelsPayload(active) {
+function getToolSourceStatus() {
+  return {
+    weather: !!process.env.weatherAPIKey,
+    news: !!(process.env.newsAPIKey || process.env.NEWS_API_KEY || process.env.NEWSDATA_API_KEY),
+    shows: !!process.env.showsAPIKey,
+  };
+}
+
+function getRuntimePayload(active) {
+  const configured = getConfiguredProviders();
   return {
     active,
-    available: MODEL_CATALOG,
+    available: filterCatalogByProviders(MODEL_CATALOG, configured),
+    personalities: listPersonalities(),
+    searchProviders: listSearchProviders(),
+    toolSources: getToolSourceStatus(),
+    configuredProviders: configured,
+    configuredSearchProviders: getConfiguredSearchProviders(),
   };
 }
 
 module.exports = {
   MODEL_CATALOG,
-  getDefaultModels,
-  applyModelUpdates,
-  getModelsPayload,
+  getDefaultRuntime,
+  applyRuntimeUpdates,
+  getRuntimePayload,
+  slotKey,
+  parseSlotKey,
+  getConfiguredProviders,
 };

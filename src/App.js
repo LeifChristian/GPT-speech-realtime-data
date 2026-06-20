@@ -7,7 +7,7 @@ import ModernConversationOverlay from "./components/ModernConversationOverlay";
 import AudioControls from "./components/AudioControls";
 import ModernUnifiedInput from "./components/ModernUnifiedInput";
 import ModernImageSidebar from "./components/ModernImageSidebar";
-import ModelSelector from "./components/ModelSelector";
+import SettingsPanel from "./components/SettingsPanel";
 import { useConversations } from "./hooks/useConversations";
 import { useSpeech } from "./hooks/useSpeech";
 import { usePasswordProtection } from "./hooks/usePasswordProtection";
@@ -30,24 +30,24 @@ function App() {
   const [currentConversationName, setCurrentConversationName] = useState('');
   const [isImageSidebarOpen, setIsImageSidebarOpen] = useState(false);
   const responseRef = useRef(null);
-  const { models, loading: modelsLoading, saving: modelsSaving, error: modelsError, updateModels } = useModels();
+  const speakTextRef = useRef(null);
+  const { config, loading: modelsLoading, saving: modelsSaving, error: modelsError, updateModels } = useModels();
 
   // Speech controls are initialized after we get handleGreeting from conversations
 
   const handleResponse = (response1, bool, imageData = null) => {
+    const speak = (text, options) => speakTextRef.current?.(text, options);
+
     if (bool) {
-      // For temporary messages like "Analyzing your image..."
       setRez(response1);
-      speakText(response1);
+      speak(response1, { skipRelisten: true });
       return;
     }
 
-    // Handle image responses
     if (imageData && imageData.type === 'image') {
       setGeneratedImage(imageData.content);
       setIsImageModalOpen(false);
-      setIsImageSidebarOpen(true); // Auto-open on generate
-      // Add to session images
+      setIsImageSidebarOpen(true);
       const newImage = {
         id: Date.now(),
         url: imageData.content,
@@ -56,11 +56,10 @@ function App() {
       };
       setSessionImages(prev => [...prev, newImage]);
       setRez(`Generated image: ${enteredText}`);
-      speakText(`I've created an image based on your prompt: ${enteredText}`);
+      speak(`I've created an image based on your prompt: ${enteredText}`);
     } else {
-      // Handle text responses
       setRez(response1);
-      speakText(response1);
+      speak(response1);
     }
     // Auto-scroll to response on mobile
     setTimeout(() => {
@@ -137,8 +136,18 @@ function App() {
     toggleMute,
     pause,
     setShowPlayPause,
-    setIsPlaying
+    setIsPlaying,
+    voiceModeActive,
+    voiceStatus,
+    isProcessing,
+    frequencyData,
+    interimTranscript,
+    stopVoiceMode,
   } = useSpeech(setRez, handleGreeting, setEnteredText);
+
+  useEffect(() => {
+    speakTextRef.current = speakText;
+  }, [speakText]);
 
   // New method for handling conversation selection (sync with hook state)
   const onSelectConversation = (conversationId, conversation) => {
@@ -295,6 +304,12 @@ function App() {
             speakText={speakText}
             updateMainResponse={(content) => setRez(content)}
             appendResponseToHistory={appendResponseToHistory}
+            voiceModeActive={voiceModeActive}
+            voiceStatus={voiceStatus}
+            frequencyData={frequencyData}
+            interimTranscript={interimTranscript}
+            startVoiceMode={startRecording}
+            stopVoiceMode={stopVoiceMode}
           />
         )}
       </AnimatePresence>
@@ -335,8 +350,8 @@ function App() {
           </p>
         </motion.div>
 
-        <ModelSelector
-          models={models}
+        <SettingsPanel
+          config={config}
           loading={modelsLoading}
           saving={modelsSaving}
           error={modelsError}
@@ -354,7 +369,13 @@ function App() {
             windowWidth={windowWidth}
             isPlaying={isPlaying}
             showPlayPause={showPlayPause}
+            voiceModeActive={voiceModeActive}
+            voiceStatus={voiceStatus}
+            isProcessing={isProcessing}
+            frequencyData={frequencyData}
+            interimTranscript={interimTranscript}
             startRecording={startRecording}
+            stopVoiceMode={stopVoiceMode}
             sendStop={sendStop}
             stopSpeakText={stopSpeakText}
             toggleMute={toggleMute}

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { apiUrl } from '../utils/api';
 
 export function useModels() {
-  const [models, setModels] = useState(null);
+  const [config, setConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -16,7 +16,7 @@ export function useModels() {
         throw new Error('Failed to load models');
       }
       const data = await response.json();
-      setModels(data);
+      setConfig(data);
       return data;
     } catch (err) {
       setError(err.message);
@@ -43,7 +43,7 @@ export function useModels() {
       if (!response.ok) {
         throw new Error(data.message || 'Failed to update models');
       }
-      setModels(data);
+      setConfig(data);
       return data;
     } catch (err) {
       setError(err.message);
@@ -53,5 +53,5 @@ export function useModels() {
     }
   }, []);
 
-  return { models, loading, error, saving, refreshModels, updateModels };
+  return { config, loading, error, saving, refreshModels, updateModels };
 }

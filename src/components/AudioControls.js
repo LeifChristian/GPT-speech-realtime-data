@@ -1,11 +1,19 @@
 import React from 'react';
 import PropTypes from 'prop-types';
+import { AnimatePresence } from 'framer-motion';
+import VoiceVisualizer from './VoiceVisualizer';
 
 const AudioControls = ({
   windowWidth,
   isPlaying,
   showPlayPause,
+  voiceModeActive,
+  voiceStatus,
+  isProcessing,
+  frequencyData,
+  interimTranscript,
   startRecording,
+  stopVoiceMode,
   sendStop,
   stopSpeakText,
   toggleMute,
@@ -13,64 +21,79 @@ const AudioControls = ({
   setRez,
   setEnteredText,
   setShowPlayPause,
-  setIsPlaying
+  setIsPlaying,
 }) => {
   const hasSpeechRecognition = typeof window !== 'undefined' && (
     window.SpeechRecognition || window.webkitSpeechRecognition
   );
-  // Hide voice input on mobile viewports only; touch detection is unreliable on desktop
-  // (many laptops report maxTouchPoints > 0 even without a touchscreen).
   const MOBILE_BREAKPOINT = 768;
-  const showStartButton = windowWidth >= MOBILE_BREAKPOINT && hasSpeechRecognition;
+  const showVoiceButton = windowWidth >= MOBILE_BREAKPOINT && hasSpeechRecognition;
 
   const handleStop = () => {
+    stopVoiceMode?.();
     sendStop();
     stopSpeakText();
     setIsPlaying(false);
     setShowPlayPause(false);
-    setRez("");
-    setEnteredText("");
+    setRez('');
+    setEnteredText('');
   };
 
+  const visualizerStatus = voiceStatus === 'idle' && voiceModeActive ? 'listening' : voiceStatus;
+
   return (
-    <div className="buttons-container">
-      {showStartButton && (
+    <div className="flex flex-col items-center gap-3 w-full max-w-md mx-auto">
+      <div className="buttons-container">
+        {showVoiceButton && (
+          <button
+            className={`button ${voiceModeActive ? 'ring-2 ring-blue-400/60' : ''}`}
+            onClick={() => startRecording()}
+            type="button"
+            aria-pressed={voiceModeActive}
+          >
+            {voiceModeActive ? 'Voice On' : 'Start Voice'}
+          </button>
+        )}
+
         <button
           className="button"
-          onClick={() => startRecording()}
+          onClick={handleStop}
           type="button"
         >
-          Start
+          Stop
         </button>
-      )}
 
-      <button
-        className="button"
-        onClick={handleStop}
-        type="button"
-      >
-        Stop
-      </button>
+        {isPlaying && (
+          <button
+            className="button"
+            onClick={() => toggleMute()}
+            type="button"
+          >
+            Mute
+          </button>
+        )}
 
-      {isPlaying && (
-        <button
-          className="button"
-          onClick={() => toggleMute()}
-          type="button"
-        >
-          Mute
-        </button>
-      )}
+        {showPlayPause && (
+          <button
+            className="button"
+            onClick={() => pause()}
+            type="button"
+          >
+            {isPlaying ? 'Pause' : 'Play'}
+          </button>
+        )}
+      </div>
 
-      {showPlayPause && (
-        <button
-          className="button"
-          onClick={() => pause()}
-          type="button"
-        >
-          {isPlaying ? 'Pause' : 'Play'}
-        </button>
-      )}
+      <AnimatePresence>
+        {voiceModeActive && (
+          <VoiceVisualizer
+            frequencyData={frequencyData}
+            isActive={voiceModeActive}
+            status={visualizerStatus}
+            interimTranscript={interimTranscript}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -79,7 +102,13 @@ AudioControls.propTypes = {
   windowWidth: PropTypes.number.isRequired,
   isPlaying: PropTypes.bool.isRequired,
   showPlayPause: PropTypes.bool.isRequired,
+  voiceModeActive: PropTypes.bool,
+  voiceStatus: PropTypes.string,
+  isProcessing: PropTypes.bool,
+  frequencyData: PropTypes.object,
+  interimTranscript: PropTypes.string,
   startRecording: PropTypes.func.isRequired,
+  stopVoiceMode: PropTypes.func,
   sendStop: PropTypes.func.isRequired,
   stopSpeakText: PropTypes.func.isRequired,
   toggleMute: PropTypes.func.isRequired,
