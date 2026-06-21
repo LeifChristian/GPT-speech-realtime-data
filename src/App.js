@@ -32,6 +32,13 @@ function App() {
   const responseRef = useRef(null);
   const speakTextRef = useRef(null);
   const { config, loading: modelsLoading, saving: modelsSaving, error: modelsError, updateModels } = useModels();
+  const personalityIdRef = useRef('default');
+
+  useEffect(() => {
+    if (config?.active?.personality) {
+      personalityIdRef.current = config.active.personality;
+    }
+  }, [config?.active?.personality]);
 
   // Speech controls are initialized after we get handleGreeting from conversations
 
@@ -124,7 +131,7 @@ function App() {
     appendResponseToHistory,
     appendQuestionToHistory,
     debugLog
-  } = useConversations(API_KEY, setRez, handleResponse);
+  } = useConversations(API_KEY, setRez, handleResponse, () => personalityIdRef.current);
 
   // Now that handleGreeting is defined, wire up speech controls with correct args
   const {

@@ -2,6 +2,12 @@ const express = require('express');
 const router = express.Router();
 const { runChatWithTools, runSimpleChat } = require('../chat/orchestrator');
 const { CLASSIFY_SYSTEM_PROMPT } = require('../prompts/classify');
+const { DEFAULT_PERSONALITY, PERSONALITIES } = require('../config/personalities');
+
+function resolvePersonalityId(requested, runtimeFallback) {
+  const id = requested ?? runtimeFallback ?? DEFAULT_PERSONALITY;
+  return PERSONALITIES[id] ? id : DEFAULT_PERSONALITY;
+}
 
 const logRequest = (req, res, next) => {
   const start = Date.now();
@@ -17,7 +23,7 @@ const logRequest = (req, res, next) => {
 router.use(logRequest);
 
 router.post('/greeting', async (req, res) => {
-  const { text } = req.body;
+  const { text, personality: requestedPersonality } = req.body;
   const runtime = req.app.locals.runtime;
 
   if (!text) {
@@ -26,15 +32,16 @@ router.post('/greeting', async (req, res) => {
 
   try {
     const { provider, model } = runtime.text;
+    const personalityId = resolvePersonalityId(requestedPersonality, runtime.personality);
     console.log(
-      `[CHAT][${req._rid}] /greeting provider=${provider} model=${model} personality=${runtime.personality} search=${runtime.searchProvider} preview=${String(text).slice(0, 120)}`
+      `[CHAT][${req._rid}] /greeting provider=${provider} model=${model} personality=${personalityId} (requested=${requestedPersonality ?? 'none'}) search=${runtime.searchProvider} preview=${String(text).slice(0, 120)}`
     );
 
     const reply = await runChatWithTools({
       provider,
       model,
       userMessage: text,
-      personalityId: runtime.personality,
+      personalityId,
       searchProvider: runtime.searchProvider,
     });
 

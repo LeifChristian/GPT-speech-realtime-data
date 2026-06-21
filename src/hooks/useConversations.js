@@ -15,7 +15,7 @@ export function getDefaultConversationName(date = new Date()) {
   return `Convo ${formattedDate} ${formattedTime}`;
 }
 
-export const useConversations = (apiKey, setRez, handleResponse) => {
+export const useConversations = (apiKey, setRez, handleResponse, getPersonalityId) => {
   const [conversations, setConversations] = useState([]);
   const [selectedConversationId, setSelectedConversationId] = useState(null);
   const [thisConversation, setThisConversation] = useState(null);
@@ -137,9 +137,13 @@ export const useConversations = (apiKey, setRez, handleResponse) => {
       ].join(' ');
 
       // Important: timestamps are NOT added to updatedHistory, only into the instruction sent to the model
+      const personality =
+        typeof getPersonalityId === 'function' ? getPersonalityId() : getPersonalityId;
+
       const payload = {
         text: `${updatedHistory} <-- ${instruction} -->  "${theStuff}"`,
         code: apiKey,
+        ...(personality ? { personality } : {}),
       };
 
       const response = await fetch(apiUrl('chat/greeting'), {
