@@ -3,6 +3,7 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 module.exports = function (app) {
   const target = 'http://localhost:3001';
   app.use('/models', createProxyMiddleware({ target, changeOrigin: true }));
+  app.use('/version', createProxyMiddleware({ target, changeOrigin: true }));
   app.use('/audio', createProxyMiddleware({ target, changeOrigin: true }));
   app.use('/process-audio', createProxyMiddleware({ target, changeOrigin: true }));
   app.use('/chat', createProxyMiddleware({ target, changeOrigin: true }));

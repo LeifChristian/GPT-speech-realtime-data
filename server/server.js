@@ -13,6 +13,7 @@ const fileRouter = require('./routes/fileRoutes');
 const modelRouter = require('./routes/modelRoutes');
 const audioRouter = require('./routes/audioRoutes');
 const { getDefaultRuntime } = require('./config/models');
+const { APP_VERSION } = require('./config/version');
 const { getOpenAIClient } = require('./providers/openai');
 
 // Initialize express app
@@ -45,6 +46,9 @@ app.locals.upload = upload;
 app.locals.runtime = { ...DEFAULT_RUNTIME };
 
 // Mount routes
+app.get('/version', (req, res) => {
+  res.json({ version: APP_VERSION });
+});
 app.use('/models', modelRouter);
 app.use('/image', imageRouter);
 app.use('/chat', chatRouter);

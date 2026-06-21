@@ -14,6 +14,7 @@ import { usePasswordProtection } from "./hooks/usePasswordProtection";
 import { useModels } from "./hooks/useModels";
 import { Button } from "./components/ui/Button";
 import { apiUrl } from "./utils/api";
+import { APP_VERSION } from "./version";
 
 const API_KEY = process.env.REACT_APP_API_KEY;
 
@@ -360,6 +361,7 @@ function App() {
           <p className="text-gray-400 text-lg">
             Intelligent conversations with image generation
           </p>
+          <p className="text-gray-500 text-sm mt-1">v{APP_VERSION}</p>
         </motion.div>
 
         <SettingsPanel

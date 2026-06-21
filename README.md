@@ -1,8 +1,14 @@
 # Omnibot (GPT Speech Realtime Data)
 
+**Version:** 1.1
+
 Voice-first AI assistant with multi-provider chat, tool calling, image generation, and realtime web search. Built for SOS Technologies community response workflows — fast to deploy, configurable at runtime, and designed to keep sensitive credentials on the server.
 
 **Production deploy branch:** `frontend-ui-x1` (DigitalOcean App Platform)
+
+### Versioning
+
+Release versions use **major.minor** only (e.g. `1.1`, `1.2`). Bump `version` in root `package.json` — the UI, `GET /version`, and server config all read from there.
 
 ---
 
@@ -167,13 +173,14 @@ Set environment variables in the DO dashboard (same names as `.env.example`). Af
 Verify deploy:
 
 ```bash
+curl -s https://your-app.ondigitalocean.app/version | jq .
 curl -s https://your-app.ondigitalocean.app/models | jq '.available.text[].model'
 curl -s -X POST https://your-app.ondigitalocean.app/chat/greeting \
   -H 'Content-Type: application/json' \
   -d '{"text":"ping","personality":"default"}' | jq '.reply'
 ```
 
-Expect `gpt-5`, `gpt-5-mini`, and `gpt-5-nano` in `/models` when running current `frontend-ui-x1`. Chat requests accept an optional `personality` field (e.g. `default`, `concise`, `comedian`).
+Expect version `1.1`, `gpt-5`, `gpt-5-mini`, and `gpt-5-nano` in `/models` when running current `frontend-ui-x1`. Chat requests accept an optional `personality` field (e.g. `default`, `concise`, `comedian`).
 
 ---
 
@@ -181,6 +188,7 @@ Expect `gpt-5`, `gpt-5-mini`, and `gpt-5-nano` in `/models` when running current
 
 | Route | Method | Description |
 |-------|--------|-------------|
+| `/version` | GET | App release version (major.minor) |
 | `/models` | GET | Active runtime config + available catalog |
 | `/models` | POST | Update text/vision/image model, personality, search provider |
 | `/chat/greeting` | POST | Main chat completion with tool loop |
