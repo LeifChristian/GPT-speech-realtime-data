@@ -10,7 +10,7 @@ Voice-first AI assistant with multi-provider chat, tool calling, image generatio
 
 - **Multi-provider chat** — OpenAI, Anthropic, xAI (Grok), and Groq via a shared orchestrator and provider adapters
 - **GPT-5 support** — GPT-5 family routes through the OpenAI Responses API; GPT-4.x uses Chat Completions
-- **Voice mode** — Continuous turn-based voice on desktop (Web Speech API STT + TTS), mic visualizer, FFwd to skip speech, 3-minute inactivity timeout
+- **Voice mode** — Continuous turn-based voice on desktop (Web Speech API STT + TTS), mic visualizer, FFwd to skip speech, 3-minute inactivity timeout; main text input hides while voice mode is active
 - **Mobile voice** — Whisper API path for STT on narrow viewports; same UI, different capture pipeline
 - **Personality presets** — Default, Direct, Creative, Analyst, Comedian (runtime-selectable system prompts)
 - **Realtime tools** — Weather, news, web search (Brave or Perplexity), streaming availability
@@ -162,15 +162,18 @@ Typical App Platform configuration:
 3. **Run command:** `cd server && NODE_ENV=production node server.js`
 4. **HTTP port:** `PORT` (injected by DO — do not hardcode in `.env`)
 
-Set environment variables in the DO dashboard (same names as `.env.example`). After code changes, trigger a **git deploy** — config-only redeploys may not pull the latest commit.
+Set environment variables in the DO dashboard (same names as `.env.example`). After code changes, trigger a **git deploy** — config-only redeploys may not pull the latest commit. If Activity shows "Updated app configuration" without a new GitHub commit, push to `frontend-ui-x1` or use **Actions → Deploy** to force a code build.
 
 Verify deploy:
 
 ```bash
 curl -s https://your-app.ondigitalocean.app/models | jq '.available.text[].model'
+curl -s -X POST https://your-app.ondigitalocean.app/chat/greeting \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"ping","personality":"default"}' | jq '.reply'
 ```
 
-Expect `gpt-5`, `gpt-5-mini`, and `gpt-5-nano` when running current `frontend-ui-x1`.
+Expect `gpt-5`, `gpt-5-mini`, and `gpt-5-nano` in `/models` when running current `frontend-ui-x1`. Chat requests accept an optional `personality` field (e.g. `default`, `concise`, `comedian`).
 
 ---
 
