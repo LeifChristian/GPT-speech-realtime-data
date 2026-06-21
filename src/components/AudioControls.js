@@ -7,6 +7,7 @@ import { canUseVoice } from '../utils/voiceDevice';
 const AudioControls = ({
   windowWidth,
   isPlaying,
+  isMuted,
   showPlayPause,
   voiceModeActive,
   voiceStatus,
@@ -26,6 +27,7 @@ const AudioControls = ({
   setIsPlaying,
 }) => {
   const showVoiceButton = canUseVoice(windowWidth);
+  const compactLabels = windowWidth < 640;
 
   const handleStop = () => {
     stopVoiceMode?.();
@@ -40,8 +42,8 @@ const AudioControls = ({
   const visualizerStatus = voiceStatus === 'idle' && voiceModeActive ? 'listening' : voiceStatus;
 
   return (
-    <div className="flex flex-col items-center gap-3 w-full max-w-md mx-auto">
-      <div className="buttons-container">
+    <div className="flex flex-col items-center gap-3 w-full max-w-md mx-auto px-2 sm:px-0">
+      <div className="buttons-container audio-controls-buttons">
         {showVoiceButton && (
           <button
             className={`button ${voiceModeActive ? 'ring-2 ring-blue-400/60' : ''}`}
@@ -49,7 +51,13 @@ const AudioControls = ({
             type="button"
             aria-pressed={voiceModeActive}
           >
-            {voiceModeActive ? 'Voice On' : 'Start Voice'}
+            {voiceModeActive
+              ? compactLabels
+                ? 'On'
+                : 'Voice On'
+              : compactLabels
+                ? 'Voice'
+                : 'Start Voice'}
           </button>
         )}
 
@@ -72,13 +80,14 @@ const AudioControls = ({
           </button>
         )}
 
-        {isPlaying && (
+        {(isPlaying || isMuted) && (
           <button
-            className="button"
+            className={`button ${isMuted ? 'ring-2 ring-amber-400/60' : ''}`}
             onClick={() => toggleMute()}
             type="button"
+            aria-pressed={isMuted}
           >
-            Mute
+            {isMuted ? 'Unmute' : 'Mute'}
           </button>
         )}
 
@@ -110,6 +119,7 @@ const AudioControls = ({
 AudioControls.propTypes = {
   windowWidth: PropTypes.number.isRequired,
   isPlaying: PropTypes.bool.isRequired,
+  isMuted: PropTypes.bool,
   showPlayPause: PropTypes.bool.isRequired,
   voiceModeActive: PropTypes.bool,
   voiceStatus: PropTypes.string,

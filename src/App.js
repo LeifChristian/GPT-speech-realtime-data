@@ -137,6 +137,7 @@ function App() {
   const {
     startRecording,
     isPlaying,
+    isMuted,
     showPlayPause,
     speakText,
     stopSpeakText,
@@ -379,6 +380,7 @@ function App() {
           <AudioControls
             windowWidth={windowWidth}
             isPlaying={isPlaying}
+            isMuted={isMuted}
             showPlayPause={showPlayPause}
             voiceModeActive={voiceModeActive}
             voiceStatus={voiceStatus}
@@ -399,26 +401,32 @@ function App() {
           />
         </motion.div>
 
-        {/* Modern Unified Input */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-          className="w-full max-w-4xl mb-4"
-        >
-          <ModernUnifiedInput
-            enteredText={enteredText}
-            setEnteredText={setEnteredText}
-            handleResponse={handleResponse}
-            sendStop={sendStop}
-            clearConversationHistory={clearConversationHistory}
-            downloadConvo={downloadConvo}
-            rez={rez}
-            handleGreeting={handleGreeting}
-            appendQuestionToHistory={appendQuestionToHistory}
-            appendResponseToHistory={appendResponseToHistory}
-          />
-        </motion.div>
+        {/* Modern Unified Input — hidden during voice mode */}
+        <AnimatePresence>
+          {!voiceModeActive && (
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              transition={{ duration: 0.3 }}
+              className="w-full max-w-4xl mb-4"
+            >
+              <ModernUnifiedInput
+                enteredText={enteredText}
+                setEnteredText={setEnteredText}
+                handleResponse={handleResponse}
+                sendStop={sendStop}
+                clearConversationHistory={clearConversationHistory}
+                downloadConvo={downloadConvo}
+                rez={rez}
+                handleGreeting={handleGreeting}
+                appendQuestionToHistory={appendQuestionToHistory}
+                appendResponseToHistory={appendResponseToHistory}
+                windowWidth={windowWidth}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Response Display */}
         <AnimatePresence>

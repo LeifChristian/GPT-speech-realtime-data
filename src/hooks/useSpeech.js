@@ -16,7 +16,9 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
   const [isRecording, setIsRecording] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayPause, setShowPlayPause] = useState(false);
-  const [toggle, setToggle] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const isMutedRef = useRef(false);
+  const speechSynthClearRef = useRef(0);
   const [finalTranscript, setFinalTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
   const [voiceModeActive, setVoiceModeActive] = useState(false);
@@ -76,6 +78,35 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
     resetInactivityTimerRef.current = resetInactivityTimer;
   }, [resetInactivityTimer]);
 
+  const isSynthBlockingListen = useCallback(() => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return false;
+    if (!speechSynthesis.speaking && !speechSynthesis.pending) return false;
+    // Browsers (especially mobile Safari) can report speaking/pending briefly after cancel()
+    if (Date.now() - speechSynthClearRef.current < 300) return false;
+    return true;
+  }, []);
+
+  /** Invalidate queued TTS segments and stop current utterance */
+  const cancelActiveSpeech = useCallback(() => {
+    speechSessionRef.current += 1;
+    speechSynthClearRef.current = Date.now();
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      speechSynthesis.cancel();
+    }
+  }, []);
+
+  const flushSpeechSynthesis = useCallback(() => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    speechSynthClearRef.current = Date.now();
+    speechSynthesis.cancel();
+    try {
+      speechSynthesis.pause();
+      speechSynthesis.resume();
+    } catch {
+      // ignore — not supported everywhere
+    }
+  }, []);
+
   const getVolumeLevel = useCallback(() => {
     const analyser = getAnalyser();
     if (!analyser) return 0;
@@ -110,7 +141,7 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
     const rec = recognitionRef.current;
     if (!rec || !voiceModeRef.current) return;
     if (isProcessingRef.current || awaitingTtsRef.current) return;
-    if (typeof window !== 'undefined' && window.speechSynthesis?.speaking) return;
+    if (isSynthBlockingListen()) return;
 
     setVoiceStatus('listening');
     setIsRecording(true);
@@ -124,7 +155,7 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
         console.error('Speech recognition start failed:', err);
       }
     }
-  }, []);
+  }, [isSynthBlockingListen]);
 
   const listenInternalRef = useRef(() => {});
   const scheduleRelistenRef = useRef(() => {});
@@ -132,7 +163,7 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
   const startMobileListeningInternal = useCallback(() => {
     if (!mobileVoicePath || !voiceModeRef.current) return;
     if (isProcessingRef.current || awaitingTtsRef.current) return;
-    if (typeof window !== 'undefined' && window.speechSynthesis?.speaking) return;
+    if (isSynthBlockingListen()) return;
 
     const stream = getStream();
     if (!stream || typeof MediaRecorder === 'undefined') return;
@@ -321,14 +352,6 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
     }
   }, [mobileVoicePath, cancelMobileVad]);
 
-  /** Invalidate queued TTS segments and stop current utterance */
-  const cancelActiveSpeech = useCallback(() => {
-    speechSessionRef.current += 1;
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      speechSynthesis.cancel();
-    }
-  }, []);
-
   const scheduleRelisten = useCallback((delayMs = RELISTEN_DELAY_MS) => {
     clearRelistenTimer();
     if (!voiceModeRef.current) return;
@@ -336,10 +359,10 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
     relistenTimerRef.current = setTimeout(() => {
       relistenTimerRef.current = null;
       if (!voiceModeRef.current || isProcessingRef.current || awaitingTtsRef.current) return;
-      if (typeof window !== 'undefined' && window.speechSynthesis?.speaking) return;
+      if (isSynthBlockingListen()) return;
       listenInternalRef.current();
     }, delayMs);
-  }, [clearRelistenTimer]);
+  }, [clearRelistenTimer, isSynthBlockingListen]);
 
   useEffect(() => {
     scheduleRelistenRef.current = scheduleRelisten;
@@ -546,6 +569,11 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
       return;
     }
 
+    if (isMutedRef.current) {
+      onSpeechComplete(options);
+      return;
+    }
+
     if (voiceModeRef.current) {
       awaitingTtsRef.current = true;
       setVoiceStatus('speaking');
@@ -558,11 +586,6 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
     setShowPlayPause(true);
 
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-      onSpeechComplete(options);
-      return;
-    }
-
-    if (toggle) {
       onSpeechComplete(options);
       return;
     }
@@ -654,7 +677,7 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
     } else {
       synthesizeSegments();
     }
-  }, [onSpeechComplete, stopListeningInternal, toggle, cancelActiveSpeech, mobileVoicePath]);
+  }, [onSpeechComplete, stopListeningInternal, cancelActiveSpeech, mobileVoicePath]);
 
   const stopSpeakText = useCallback(() => {
     cancelActiveSpeech();
@@ -686,16 +709,22 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
   }, [clearRelistenTimer, scheduleRelisten, cancelActiveSpeech, resetInactivityTimer]);
 
   const toggleMute = useCallback(() => {
-    setToggle((prev) => !prev);
-    if (typeof window !== 'undefined' && window.speechSynthesis?.speaking) {
-      cancelActiveSpeech();
-      awaitingTtsRef.current = false;
-      if (voiceModeRef.current) {
-        setVoiceStatus('listening');
-        scheduleRelisten();
-      }
+    const nextMuted = !isMutedRef.current;
+    isMutedRef.current = nextMuted;
+    setIsMuted(nextMuted);
+
+    cancelActiveSpeech();
+    flushSpeechSynthesis();
+    awaitingTtsRef.current = false;
+    setIsPlaying(false);
+
+    if (voiceModeRef.current) {
+      setVoiceStatus('listening');
+      scheduleRelisten(nextMuted ? RELISTEN_DELAY_MS : SKIP_TO_LISTEN_DELAY_MS);
+    } else {
+      setShowPlayPause(false);
     }
-  }, [scheduleRelisten, cancelActiveSpeech]);
+  }, [scheduleRelisten, cancelActiveSpeech, flushSpeechSynthesis]);
 
   const pause = useCallback(() => {
     if (isPlaying) {
@@ -739,6 +768,7 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
     toggleVoiceMode,
     stopRecording,
     isPlaying,
+    isMuted,
     showPlayPause,
     speakText,
     stopSpeakText,

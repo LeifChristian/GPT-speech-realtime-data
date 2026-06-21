@@ -135,11 +135,32 @@ textarea {
   z-index: 1;
   margin-top: 0;
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   justify-content: center;
   align-items: center;
   padding: 2%;
-  gap: 10px;
+  gap: 8px;
+  width: 100%;
+  max-width: 100%;
+}
+
+.audio-controls-buttons .button {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  .audio-controls-buttons {
+    padding: 0 4px;
+    gap: 6px;
+  }
+
+  .audio-controls-buttons .button {
+    padding: 8px 12px;
+    margin: 0;
+    font-size: 0.8125rem;
+  }
 }
 
 ::-webkit-scrollbar {

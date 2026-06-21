@@ -7,6 +7,7 @@ import { Button } from './ui/Button';
 import { TextArea } from './ui/Input';
 import { GlassCard } from './ui/Card';
 import { apiUrl, debugFetch } from '../utils/api';
+import { MOBILE_BREAKPOINT } from '../utils/voiceDevice';
 import DebugOverlay from './DebugOverlay';
 
 const ModernUnifiedInput = ({
@@ -19,7 +20,8 @@ const ModernUnifiedInput = ({
     rez,
     handleGreeting,
     appendQuestionToHistory,
-    appendResponseToHistory
+    appendResponseToHistory,
+    windowWidth = typeof window !== 'undefined' ? window.innerWidth : MOBILE_BREAKPOINT,
 }) => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [debugOpen, setDebugOpen] = useState(false);
@@ -186,6 +188,27 @@ const ModernUnifiedInput = ({
         }
     };
 
+    const isMobileView = windowWidth < MOBILE_BREAKPOINT;
+
+    const handleTextareaKeyDown = (e) => {
+        if (e.key !== 'Enter') return;
+
+        if (isMobileView) {
+            if (e.ctrlKey || e.metaKey) {
+                e.preventDefault();
+                handleSubmit();
+            }
+            return;
+        }
+
+        if (!e.shiftKey) {
+            e.preventDefault();
+            if (!isProcessing && (enteredText.trim() || file)) {
+                handleSubmit();
+            }
+        }
+    };
+
     return (
         <div>
             <div className="w-full max-w-4xl mx-auto px-4">
@@ -296,18 +319,15 @@ const ModernUnifiedInput = ({
                             disabled={isProcessing}
                             className={`min-h-[100px] max-h-[200px] transition-all duration-300 ${file ? 'border-green-400/50' : 'border-white/20'
                                 }`}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                                    e.preventDefault();
-                                    handleSubmit();
-                                }
-                            }}
+                            onKeyDown={handleTextareaKeyDown}
                         />
 
                         <div className="text-xs text-gray-400 text-center">
                             {file ? 'Image analysis mode' : 'Smart mode - AI will detect if you want text or image generation'}
                             <br />
-                            Press Ctrl+Enter to send
+                            {isMobileView
+                                ? 'Press Ctrl+Enter to send'
+                                : 'Press Enter to send, Shift+Enter for new line'}
                         </div>
                     </div>
 
@@ -372,6 +392,7 @@ ModernUnifiedInput.propTypes = {
     handleGreeting: PropTypes.func.isRequired,
     appendQuestionToHistory: PropTypes.func.isRequired,
     appendResponseToHistory: PropTypes.func.isRequired,
+    windowWidth: PropTypes.number,
 };
 
 export default ModernUnifiedInput;
