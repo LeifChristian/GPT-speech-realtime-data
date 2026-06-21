@@ -1,120 +1,240 @@
-# AI-Talkbot with realtime data capabilities
+# Omnibot (GPT Speech Realtime Data)
 
-# ADDED SUPPORT FOR IMAGE GENERATION AND EXPLANATION
- ~ via GPT 4O
+Voice-first AI assistant with multi-provider chat, tool calling, image generation, and realtime web search. Built for SOS Technologies community response workflows — fast to deploy, configurable at runtime, and designed to keep sensitive credentials on the server.
 
-****************** 
+**Production deploy branch:** `frontend-ui-x1` (DigitalOcean App Platform)
 
-server-llama.js provides llama3 and mixtral apis using groq cloud.
-*** it would be awesome to be able to select models from the front end.
+---
 
-front end could select which api to use by calling different routes depending on model selected
+## Features
 
-*** first and second completions can be DIFFERENT MODELS. Holy shit thats cool.
+- **Multi-provider chat** — OpenAI, Anthropic, xAI (Grok), and Groq via a shared orchestrator and provider adapters
+- **GPT-5 support** — GPT-5 family routes through the OpenAI Responses API; GPT-4.x uses Chat Completions
+- **Voice mode** — Continuous turn-based voice on desktop (Web Speech API STT + TTS), mic visualizer, FFwd to skip speech, 3-minute inactivity timeout
+- **Mobile voice** — Whisper API path for STT on narrow viewports; same UI, different capture pipeline
+- **Personality presets** — Default, Direct, Creative, Analyst, Comedian (runtime-selectable system prompts)
+- **Realtime tools** — Weather, news, web search (Brave or Perplexity), streaming availability
+- **Image generation** — GPT Image models via OpenAI
+- **Vision** — Upload or camera capture for image analysis
+- **Conversations** — LocalStorage persistence, export, auto-named new chats
+- **Settings panel** — Model, personality, and search provider selection without redeploy
 
-server.js = original chatGPT completions model, which still wins so far.
-server-llama.js = groq implementation of llama3 or mixtral. openai seems best still at this point for this application. lol
+---
 
-App-og.js = original GPT-3.5 implementation and front end prompts. 
+## Architecture
 
-Simply string apis together, line up your prompts and magic! A little friend, with amnesia.
-Built using gpt-3.5-turbo-0613.
+```
+React (port 3000 dev)          Express API (port 3001 / PORT in prod)
+        |                                |
+        +-------- /models, /chat --------+
+        +-------- /image, /audio --------+
+        +-------- /file -----------------+
 
-# Features: 
+server/
+  chat/orchestrator.js     Unified tool loop (max 3 rounds)
+  tools/                   Provider-agnostic JSON schemas + executors
+  providers/               OpenAI, Anthropic, xAI, Groq adapters
+  config/models.js         Runtime catalog + defaults
+  config/personalities.js  System prompt presets
+  config/search.js         Brave / Perplexity toggle
+  routes/                  HTTP endpoints
+```
 
-    Realtime data and news via Bing search summary and function call completions 
-        --(this works most of the time, if it doesn't ask again and say "news search", or "live search")
-    Conversational context for follow up questions
-    Local storage of conversations, pick up where you left off
-    Export conversations to a text file
+In **production**, a single Express process serves the API and the React `build/` static bundle (`NODE_ENV=production`).
 
-# ENV
-need a .env file in the root of the project, and the same .env file in the server subfolder.
+---
 
-myAPIKey=API_KEY_HERE
-theCode=CODE_TO_SECURE_ROUTES_FRONTEND_TO_BACKEND
-REACT_APP_API_KEY=CODE_TO_SECURE_ROUTES_FRONTEND_TO_BACKEND
-searchAPIKey=SEARCH_API_KEY_HERE
+## Branch strategy
 
-# TO RUN
+| Branch | Purpose |
+|--------|---------|
+| `frontend-ui-x1` | **Production** — DigitalOcean watches this branch |
+| `beta` | Multi-provider harness experiments; merge into x1 when stable |
+| `main` | Mirror of production after PR merges |
+| `frontend-overhaul` | Legacy; not used for DO deploy |
 
-recommend using pnpm to install both react app and server backend
-run pnpm dev.
+Pushes to `main` alone do **not** deploy. Always push production changes to `frontend-ui-x1`.
 
- make sure your attached apis and api keys are set up and working. Shit is about to get real. 
+---
 
+## Prerequisites
 
- <--- BEGIN BOILERPLATE rEaCt README
+- Node.js 20.x
+- [pnpm](https://pnpm.io/) 9.x (recommended)
+- API keys (see Environment below)
 
-# Getting Started with Create React App
+---
 
-hint: openai
+## Quick start
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+```bash
+git clone https://github.com/LeifChristian/GPT-speech-realtime-data.git
+cd GPT-speech-realtime-data
+cp .env.example .env
+# Edit .env — at minimum set OPENAI_API_KEY, theCode, REACT_APP_API_KEY
 
-## Available Scripts
+pnpm install
+cd server && pnpm install && cd ..
 
-In the project directory, you can run:
+pnpm dev
+```
 
-### `npm start`
+- **Frontend:** http://localhost:3000
+- **API (dev):** http://localhost:3001
 
-Runs the app in the development mode.
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+`pnpm dev` runs the React dev server and the Express API concurrently. The dev proxy in `src/setupProxy.js` forwards API routes to port 3001.
 
-The page will reload when you make changes.
-You may also see any lint errors in the console.
+---
 
-### `npm test`
+## Environment
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+Copy `.env.example` to `.env` at the repo root. For local dev, one root `.env` is enough. Copy to `server/.env` only if you run the server from `server/` directly.
 
-### `npm run build`
+### Required
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+| Variable | Purpose |
+|----------|---------|
+| `OPENAI_API_KEY` | Chat, vision, image generation, mobile Whisper STT |
+| `theCode` | Shared secret for `/file` save and export |
+| `REACT_APP_API_KEY` | Same value as `theCode` (sent from frontend) |
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### Optional — enable extra providers
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+| Variable | Purpose |
+|----------|---------|
+| `ANTHROPIC_API_KEY` | Claude models |
+| `XAI_API_KEY` | Grok models |
+| `GROQ_API_KEY` | Llama / Mixtral via Groq |
 
-### `npm run eject`
+Providers without keys are omitted from the Settings catalog automatically.
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+### Optional — model defaults (server startup)
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+| Variable | Default |
+|----------|---------|
+| `OPENAI_MODEL` | `gpt-4o-mini` |
+| `OPENAI_VISION_MODEL` | `gpt-4o` |
+| `OPENAI_IMAGE_MODEL` | `gpt-image-1` |
+| `DEFAULT_PERSONALITY` | `default` |
+| `SEARCH_PROVIDER` | `brave` (falls back to `perplexity` if Brave key missing) |
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+Settings panel changes are in-memory until restart unless persisted via env on redeploy.
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+### Optional — tools and search
 
-## Learn More
+| Variable | Tool |
+|----------|------|
+| `BRAVE_API_KEY` | Web search (recommended) |
+| `PERPLEXITY_API_KEY` | Web search (AI-summarized) |
+| `weatherAPIKey` | Current weather |
+| `newsAPIKey` / `NEWS_API_KEY` | News headlines |
+| `showsAPIKey` | Streaming availability |
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+### Optional — frontend gate
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+| Variable | Purpose |
+|----------|---------|
+| `REACT_APP_PASSWORD` | Numeric password on first load |
+| `REACT_APP_API_BASE_URL` | API origin when frontend and backend are on different hosts |
 
-### Code Splitting
+Never commit `.env` or paste keys into the repo. Rotate any key that was exposed in chat or logs.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+---
 
-### Analyzing the Bundle Size
+## Scripts
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+| Command | Description |
+|---------|-------------|
+| `pnpm dev` | React (3000) + API (3001) with hot reload |
+| `pnpm start` | React dev server only |
+| `pnpm run server` | Express API only (nodemon) |
+| `pnpm run build` | Production React build → `build/` |
+| `cd server && pnpm start` | Run API (`node server.js`) |
 
-### Making a Progressive Web App
+---
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+## Production (DigitalOcean)
 
-### Advanced Configuration
+Typical App Platform configuration:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+1. **Source branch:** `frontend-ui-x1`
+2. **Build command:** `pnpm install && pnpm run build && cd server && pnpm install`
+3. **Run command:** `cd server && NODE_ENV=production node server.js`
+4. **HTTP port:** `PORT` (injected by DO — do not hardcode in `.env`)
 
-### Deployment
+Set environment variables in the DO dashboard (same names as `.env.example`). After code changes, trigger a **git deploy** — config-only redeploys may not pull the latest commit.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+Verify deploy:
 
-### `npm run build` fails to minify
+```bash
+curl -s https://your-app.ondigitalocean.app/models | jq '.available.text[].model'
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+Expect `gpt-5`, `gpt-5-mini`, and `gpt-5-nano` when running current `frontend-ui-x1`.
+
+---
+
+## API routes
+
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/models` | GET | Active runtime config + available catalog |
+| `/models` | POST | Update text/vision/image model, personality, search provider |
+| `/chat/greeting` | POST | Main chat completion with tool loop |
+| `/chat/classify` | POST | Detect text vs image intent |
+| `/image/generate` | POST | GPT Image generation |
+| `/image/analyze` | POST | Vision analysis |
+| `/audio/transcribe` | POST | Whisper STT (mobile path) |
+| `/file/save` | POST | Save conversation (requires API key) |
+| `/file/export` | POST | Export conversation (requires API key) |
+
+---
+
+## Model catalog (high level)
+
+**Chat:** GPT-4o family, GPT-4.1, GPT-5 family (Responses API), Claude, Grok, Groq open models
+
+**Vision:** GPT-4o, Claude Sonnet 4, Grok 2 Vision
+
+**Image:** GPT Image 1 / 1 Mini / 1.5 (OpenAI only)
+
+Select models in the Settings dropdown under the title bar. GPT-5 entries show a `Responses` suffix.
+
+---
+
+## Security notes
+
+- API keys live server-side only; the frontend receives a filtered model catalog
+- `/file` routes require `REACT_APP_API_KEY` matching server `theCode`
+- Optional `REACT_APP_PASSWORD` adds a client-side gate (not a substitute for auth at scale)
+- CORS is open (`*`) — acceptable for a single-tenant deploy; tighten for multi-tenant use
+- Do not commit secrets; use DO encrypted env vars in production
+
+---
+
+## Legacy files
+
+These remain for reference and are not used by the current app entry point:
+
+- `src/App-llama.js`, `server-llama.js` — early Groq experiments
+- `src/App-og.js` — original GPT-3.5 frontend
+
+Active entry: `src/App.js` + `server/server.js`.
+
+---
+
+## Troubleshooting
+
+**Settings shows only GPT-4 models on prod** — DO may have redeployed config without pulling latest git. Confirm branch is `frontend-ui-x1` and trigger a fresh deploy from GitHub.
+
+**`Route not found` on localhost:3000** — API routes must go through the dev proxy; use `pnpm dev`, not `pnpm start` alone.
+
+**Voice Start hidden on desktop** — Viewport detection may classify as mobile; widen browser or check `src/utils/voiceDevice.js`.
+
+**Brave search fails** — Set `BRAVE_API_KEY` or switch to Perplexity in Settings.
+
+---
+
+## License
+
+Private / internal SOS Technologies project. See repository owner for usage terms.
