@@ -13,11 +13,6 @@ export function isWindowsDesktop() {
   return /Win/i.test(navigator.userAgent) || /Windows/i.test(navigator.platform);
 }
 
-export function isWindowsChromium() {
-  if (!isWindowsDesktop()) return false;
-  return /Chrome|Chromium|Edg/i.test(navigator.userAgent);
-}
-
 export function hasSpeechRecognition() {
   return (
     typeof window !== 'undefined' &&
@@ -26,11 +21,13 @@ export function hasSpeechRecognition() {
 }
 
 /**
- * Whisper + MediaRecorder — mobile/narrow viewports and iOS only.
+ * Whisper + MediaRecorder with one shared getUserMedia stream.
+ * Windows desktop must use this — Web Speech API fights the mic stream on Windows Chrome.
  */
 export function usesRecorderVoicePath(windowWidth) {
   if (typeof windowWidth === 'number' && windowWidth < MOBILE_BREAKPOINT) return true;
   if (isIOSDevice()) return true;
+  if (isWindowsDesktop()) return true;
   return false;
 }
 
@@ -39,23 +36,7 @@ export function usesMobileVoicePath(windowWidth) {
   return usesRecorderVoicePath(windowWidth);
 }
 
-/**
- * Windows Chromium desktop: Web Speech STT without getUserMedia.
- * Decorative animated visualizer — avoids mic conflict with SpeechRecognition.
- */
-export function usesSyntheticVoiceVisualizer(windowWidth) {
-  if (usesRecorderVoicePath(windowWidth)) return false;
-  return isWindowsChromium() && hasSpeechRecognition();
-}
-
-/** Real mic stream for live frequency bars (recorder path + non-Windows desktop speech). */
-export function needsMicStreamForVoice(windowWidth) {
-  if (usesRecorderVoicePath(windowWidth)) return true;
-  if (usesSyntheticVoiceVisualizer(windowWidth)) return false;
-  return hasSpeechRecognition();
-}
-
-/** Desktop speech recognition (Mac/Linux + Windows Chromium). */
+/** Mac/Linux wide desktop — Web Speech API + live mic visualizer */
 export function usesSpeechRecognitionPath(windowWidth) {
   return !usesRecorderVoicePath(windowWidth) && hasSpeechRecognition();
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useMicAnalyser } from './useMicAnalyser';
-import { usesRecorderVoicePath, needsMicStreamForVoice } from '../utils/voiceDevice';
+import { usesRecorderVoicePath } from '../utils/voiceDevice';
 import { getRecorderMimeType, transcribeAudio } from '../utils/transcribeAudio';
 
 const RELISTEN_DELAY_MS = 750;
@@ -37,7 +37,6 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
   const resetInactivityTimerRef = useRef(() => {});
 
   const recorderVoicePath = useMemo(() => usesRecorderVoicePath(windowWidth), [windowWidth]);
-  const needsMicStream = useMemo(() => needsMicStreamForVoice(windowWidth), [windowWidth]);
   const mediaRecorderRef = useRef(null);
   const mobileVadRafRef = useRef(null);
   const mobileHadSpeechRef = useRef(false);
@@ -449,9 +448,7 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
         voiceModeRef.current = false;
         setVoiceModeActive(false);
         setVoiceStatus('idle');
-        if (needsMicStream) {
-          stopMic();
-        }
+        stopMic();
       }
     };
 
@@ -476,7 +473,7 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
       }
       recognitionRef.current = null;
     };
-  }, [scheduleRelisten, stopMic, clearRelistenTimer, recorderVoicePath, needsMicStream]);
+  }, [scheduleRelisten, stopMic, clearRelistenTimer, recorderVoicePath]);
 
   const stopVoiceMode = useCallback(() => {
     voiceModeRef.current = false;
@@ -490,14 +487,12 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
     mobileStoppingRef.current = false;
     cancelMobileVad();
     stopListeningInternal();
-    if (needsMicStream) {
-      stopMic();
-    }
+    stopMic();
     cancelActiveSpeech();
     setIsPlaying(false);
     setShowPlayPause(false);
     setInterimTranscript('');
-  }, [clearRelistenTimer, clearInactivityTimer, stopListeningInternal, stopMic, cancelActiveSpeech, cancelMobileVad, needsMicStream]);
+  }, [clearRelistenTimer, clearInactivityTimer, stopListeningInternal, stopMic, cancelActiveSpeech, cancelMobileVad]);
 
   useEffect(() => {
     stopVoiceModeRef.current = stopVoiceMode;
@@ -516,19 +511,17 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
 
     cancelActiveSpeech();
 
-    if (needsMicStream) {
-      const micOk = await startMic();
-      if (!micOk) {
-        alert('Microphone access is required for voice mode.');
-        return;
-      }
+    const micOk = await startMic();
+    if (!micOk) {
+      alert('Microphone access is required for voice mode.');
+      return;
     }
 
     voiceModeRef.current = true;
     setVoiceModeActive(true);
     resetInactivityTimer();
     listenInternalRef.current();
-  }, [recorderVoicePath, needsMicStream, startMic, cancelActiveSpeech, resetInactivityTimer]);
+  }, [recorderVoicePath, startMic, cancelActiveSpeech, resetInactivityTimer]);
 
   const toggleVoiceMode = useCallback(() => {
     if (voiceModeRef.current) {
@@ -604,33 +597,40 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
 
     const splitTextIntoSegments = (input) => {
       const maxWordsPerSegment = 32;
-      const sentences = input.split(/([.!?:])/);
+      // Avoid splitting decimals (1.00), times (12:30), etc. Punctuation is consumed at boundaries.
+      const boundaryPattern = /(?<!\d)[.!?](?!\d)|(?<!\d):(?!\d)/g;
+      const parts = input.split(boundaryPattern);
       const segments = [];
       let currentSegment = '';
 
-      sentences.forEach((sentence) => {
-        if (sentence.match(/[.!?:]/)) {
-          if (currentSegment) {
-            segments.push(currentSegment);
-            currentSegment = '';
+      const flushSegment = () => {
+        const trimmed = currentSegment.trim();
+        if (trimmed) segments.push(trimmed);
+        currentSegment = '';
+      };
+
+      parts.forEach((part) => {
+        const trimmed = part.trim();
+        if (!trimmed) return;
+
+        const words = trimmed.split(/\s+/).filter(Boolean);
+        words.forEach((word) => {
+          const wordCount = currentSegment ? currentSegment.split(/\s+/).filter(Boolean).length : 0;
+          if (wordCount >= maxWordsPerSegment) {
+            flushSegment();
+            currentSegment = word;
+          } else {
+            currentSegment += (currentSegment ? ' ' : '') + word;
           }
-          segments.push(sentence.trim());
-        } else {
-          const words = sentence.split(/\s+/);
-          words.forEach((word) => {
-            if (currentSegment.split(/\s+/).length < maxWordsPerSegment) {
-              currentSegment += (currentSegment ? ' ' : '') + word;
-            } else {
-              segments.push(currentSegment);
-              currentSegment = word;
-            }
-          });
-        }
+        });
+        flushSegment();
       });
 
-      if (currentSegment) segments.push(currentSegment);
-      return segments.filter(Boolean);
+      return segments;
     };
+
+    const prepareSpeechSegment = (segment) =>
+      String(segment || '').replace(/^Response:\s*/i, '').trim();
 
     const segments = splitTextIntoSegments(cleaned);
 
@@ -645,14 +645,13 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
       }
 
       const segment = segments.shift();
-      const utterance = new SpeechSynthesisUtterance(
-        segment
-          .replaceAll('Response:', '')
-          .replaceAll('.', '')
-          .replaceAll('!', '')
-          .replaceAll('?', '')
-          .replaceAll(':', '')
-      );
+      const speechText = prepareSpeechSegment(segment);
+      if (!speechText) {
+        synthesizeSegments();
+        return;
+      }
+
+      const utterance = new SpeechSynthesisUtterance(speechText);
 
       const voices = speechSynthesis.getVoices();
       const preferred =
