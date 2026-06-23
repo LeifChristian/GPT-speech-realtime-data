@@ -5,6 +5,7 @@ import { X, MessageSquare, User, Bot, ImagePlus, Send, Square, Play, Pause, Mic,
 import { Button } from './ui/Button';
 import { GlassCard } from './ui/Card';
 import VoiceVisualizer from './VoiceVisualizer';
+import { usesSyntheticVoiceVisualizer } from '../utils/voiceDevice';
 
 const ModernConversationOverlay = ({
     conversation,
@@ -26,6 +27,7 @@ const ModernConversationOverlay = ({
     skipSpeechAndListen,
     isPlaying = false,
     showPlayPause = false,
+    windowWidth = typeof window !== 'undefined' ? window.innerWidth : 1024,
 }) => {
     // Local input state (must be declared before any conditional returns)
     const [inputText, setInputText] = useState('');
@@ -468,6 +470,7 @@ const ModernConversationOverlay = ({
                                 isActive={voiceModeActive}
                                 status={voiceStatus}
                                 interimTranscript={interimTranscript}
+                                syntheticVisualizer={usesSyntheticVoiceVisualizer(windowWidth)}
                             />
                         )}
                         <div

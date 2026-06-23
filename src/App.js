@@ -323,6 +323,7 @@ function App() {
             skipSpeechAndListen={skipSpeechAndListen}
             isPlaying={isPlaying}
             showPlayPause={showPlayPause}
+            windowWidth={windowWidth}
           />
         )}
       </AnimatePresence>
