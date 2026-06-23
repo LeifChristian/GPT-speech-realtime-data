@@ -5,7 +5,6 @@ import { X, MessageSquare, User, Bot, ImagePlus, Send, Square, Play, Pause, Mic,
 import { Button } from './ui/Button';
 import { GlassCard } from './ui/Card';
 import VoiceVisualizer from './VoiceVisualizer';
-import { usesSyntheticVoiceVisualizer } from '../utils/voiceDevice';
 
 const ModernConversationOverlay = ({
     conversation,
@@ -470,7 +469,6 @@ const ModernConversationOverlay = ({
                                 isActive={voiceModeActive}
                                 status={voiceStatus}
                                 interimTranscript={interimTranscript}
-                                syntheticVisualizer={usesSyntheticVoiceVisualizer(windowWidth)}
                             />
                         )}
                         <div

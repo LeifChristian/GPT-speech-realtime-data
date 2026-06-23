@@ -2,7 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { AnimatePresence } from 'framer-motion';
 import VoiceVisualizer from './VoiceVisualizer';
-import { canUseVoice, usesSyntheticVoiceVisualizer } from '../utils/voiceDevice';
+import { canUseVoice } from '../utils/voiceDevice';
 
 const AudioControls = ({
   windowWidth,
@@ -40,7 +40,6 @@ const AudioControls = ({
   };
 
   const visualizerStatus = voiceStatus === 'idle' && voiceModeActive ? 'listening' : voiceStatus;
-  const syntheticVisualizer = usesSyntheticVoiceVisualizer(windowWidth);
 
   return (
     <div className="flex flex-col items-center gap-3 w-full max-w-md mx-auto px-2 sm:px-0">
@@ -110,7 +109,6 @@ const AudioControls = ({
             isActive={voiceModeActive}
             status={visualizerStatus}
             interimTranscript={interimTranscript}
-            syntheticVisualizer={syntheticVisualizer}
           />
         )}
       </AnimatePresence>

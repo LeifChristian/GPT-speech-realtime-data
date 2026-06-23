@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Settings2, Sparkles, ChevronDown, Globe, Wrench } from 'lucide-react';
@@ -32,6 +32,23 @@ const sectionLabelClass = 'text-xs uppercase tracking-wide text-white/60';
 
 const SettingsPanel = ({ config, loading, saving, error, onChange }) => {
   const [collapsed, setCollapsed] = useState(true);
+  const panelRef = useRef(null);
+
+  useEffect(() => {
+    if (collapsed) return undefined;
+
+    const handleOutsidePointer = (event) => {
+      if (panelRef.current?.contains(event.target)) return;
+      setCollapsed(true);
+    };
+
+    document.addEventListener('mousedown', handleOutsidePointer);
+    document.addEventListener('touchstart', handleOutsidePointer);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsidePointer);
+      document.removeEventListener('touchstart', handleOutsidePointer);
+    };
+  }, [collapsed]);
 
   if (loading && !config) {
     return (
@@ -77,7 +94,7 @@ const SettingsPanel = ({ config, loading, saving, error, onChange }) => {
 
   return (
     <div className="w-full max-w-md mx-auto mb-3 px-3 sm:px-4 relative z-50">
-      <GlassCard className="relative shadow-lg shadow-black/20 overflow-visible isolate">
+      <GlassCard ref={panelRef} className="relative shadow-lg shadow-black/20 overflow-visible isolate">
         <button
           type="button"
           className="flex w-full items-center justify-between gap-2 px-3 sm:px-4 py-2.5 text-white hover:bg-white/5 transition-colors rounded-xl"
