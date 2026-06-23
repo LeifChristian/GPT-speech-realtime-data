@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useMicAnalyser } from './useMicAnalyser';
-import { usesRecorderVoicePath } from '../utils/voiceDevice';
+import { usesRecorderVoicePath, needsMicStreamForVoice } from '../utils/voiceDevice';
 import { getRecorderMimeType, transcribeAudio } from '../utils/transcribeAudio';
 
 const RELISTEN_DELAY_MS = 750;
@@ -37,6 +37,7 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
   const resetInactivityTimerRef = useRef(() => {});
 
   const recorderVoicePath = useMemo(() => usesRecorderVoicePath(windowWidth), [windowWidth]);
+  const needsMicStream = useMemo(() => needsMicStreamForVoice(windowWidth), [windowWidth]);
   const mediaRecorderRef = useRef(null);
   const mobileVadRafRef = useRef(null);
   const mobileHadSpeechRef = useRef(false);
@@ -448,7 +449,9 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
         voiceModeRef.current = false;
         setVoiceModeActive(false);
         setVoiceStatus('idle');
-        stopMic();
+        if (needsMicStream) {
+          stopMic();
+        }
       }
     };
 
@@ -473,7 +476,7 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
       }
       recognitionRef.current = null;
     };
-  }, [scheduleRelisten, stopMic, clearRelistenTimer, recorderVoicePath]);
+  }, [scheduleRelisten, stopMic, clearRelistenTimer, recorderVoicePath, needsMicStream]);
 
   const stopVoiceMode = useCallback(() => {
     voiceModeRef.current = false;
@@ -487,12 +490,14 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
     mobileStoppingRef.current = false;
     cancelMobileVad();
     stopListeningInternal();
-    stopMic();
+    if (needsMicStream) {
+      stopMic();
+    }
     cancelActiveSpeech();
     setIsPlaying(false);
     setShowPlayPause(false);
     setInterimTranscript('');
-  }, [clearRelistenTimer, clearInactivityTimer, stopListeningInternal, stopMic, cancelActiveSpeech, cancelMobileVad]);
+  }, [clearRelistenTimer, clearInactivityTimer, stopListeningInternal, stopMic, cancelActiveSpeech, cancelMobileVad, needsMicStream]);
 
   useEffect(() => {
     stopVoiceModeRef.current = stopVoiceMode;
@@ -511,17 +516,19 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
 
     cancelActiveSpeech();
 
-    const micOk = await startMic();
-    if (!micOk) {
-      alert('Microphone access is required for voice mode.');
-      return;
+    if (needsMicStream) {
+      const micOk = await startMic();
+      if (!micOk) {
+        alert('Microphone access is required for voice mode.');
+        return;
+      }
     }
 
     voiceModeRef.current = true;
     setVoiceModeActive(true);
     resetInactivityTimer();
     listenInternalRef.current();
-  }, [recorderVoicePath, startMic, cancelActiveSpeech, resetInactivityTimer]);
+  }, [recorderVoicePath, needsMicStream, startMic, cancelActiveSpeech, resetInactivityTimer]);
 
   const toggleVoiceMode = useCallback(() => {
     if (voiceModeRef.current) {

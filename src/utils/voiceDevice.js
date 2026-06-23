@@ -20,20 +20,35 @@ export function hasSpeechRecognition() {
   );
 }
 
-/**
- * Whisper + MediaRecorder with one shared getUserMedia stream.
- * Windows desktop must use this — Web Speech API fights the mic stream on Windows Chrome.
- */
+/** Whisper + MediaRecorder — mobile/narrow viewports and iOS only. */
 export function usesRecorderVoicePath(windowWidth) {
   if (typeof windowWidth === 'number' && windowWidth < MOBILE_BREAKPOINT) return true;
   if (isIOSDevice()) return true;
-  if (isWindowsDesktop()) return true;
   return false;
 }
 
 /** @deprecated use usesRecorderVoicePath */
 export function usesMobileVoicePath(windowWidth) {
   return usesRecorderVoicePath(windowWidth);
+}
+
+/**
+ * Windows wide desktop: Web Speech API only (same as legacy Start button).
+ * Skip getUserMedia — a second mic stream blocks SpeechRecognition on Windows Chrome.
+ */
+export function usesWindowsDesktopSpeechPath(windowWidth) {
+  if (usesRecorderVoicePath(windowWidth)) return false;
+  return isWindowsDesktop() && hasSpeechRecognition();
+}
+
+export function needsMicStreamForVoice(windowWidth) {
+  if (usesRecorderVoicePath(windowWidth)) return true;
+  if (usesWindowsDesktopSpeechPath(windowWidth)) return false;
+  return hasSpeechRecognition();
+}
+
+export function usesSyntheticVoiceVisualizer(windowWidth) {
+  return usesWindowsDesktopSpeechPath(windowWidth);
 }
 
 /** Mac/Linux wide desktop — Web Speech API + live mic visualizer */
