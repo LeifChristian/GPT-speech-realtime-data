@@ -48,3 +48,8 @@ export function canUseVoice(windowWidth) {
   }
   return hasSpeechRecognition();
 }
+
+/** Decorative canvas bars only — no mic. Windows wide desktop while SpeechRecognition runs. */
+export function usesDecorativeVoiceVisualizer(windowWidth) {
+  return !usesMobileVoicePath(windowWidth) && !shouldUseMicAnalyser(windowWidth);
+}

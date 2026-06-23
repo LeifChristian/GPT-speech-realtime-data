@@ -13,13 +13,12 @@ function drawFlatLine(ctx, width, height) {
   ctx.stroke();
 }
 
-function drawBars(ctx, width, height, frequencyData) {
-  const step = Math.max(1, Math.floor(frequencyData.length / BAR_COUNT));
+function drawBars(ctx, width, height, levels) {
   const barWidth = width / BAR_COUNT;
   const gap = Math.max(1, barWidth * 0.15);
 
   for (let i = 0; i < BAR_COUNT; i += 1) {
-    const value = frequencyData[i * step] / 255;
+    const value = levels[i] ?? 0;
     const barHeight = Math.max(4, value * height * 0.9);
     const x = i * barWidth + gap / 2;
     const y = (height - barHeight) / 2;
@@ -36,9 +35,38 @@ function drawBars(ctx, width, height, frequencyData) {
   }
 }
 
-const VoiceVisualizer = ({ frequencyData, isActive, status = 'listening', interimTranscript = '' }) => {
+function levelsFromFrequencyData(frequencyData) {
+  const step = Math.max(1, Math.floor(frequencyData.length / BAR_COUNT));
+  const levels = new Array(BAR_COUNT);
+  for (let i = 0; i < BAR_COUNT; i += 1) {
+    levels[i] = frequencyData[i * step] / 255;
+  }
+  return levels;
+}
+
+function decorativeLevels(frame) {
+  const levels = new Array(BAR_COUNT);
+  const t = frame * 0.05;
+  for (let i = 0; i < BAR_COUNT; i += 1) {
+    const wave =
+      Math.sin(t + i * 0.45) * 0.22 +
+      Math.sin(t * 1.7 + i * 0.18) * 0.12 +
+      0.28;
+    levels[i] = Math.max(0.08, Math.min(0.95, wave));
+  }
+  return levels;
+}
+
+const VoiceVisualizer = ({
+  frequencyData,
+  isActive,
+  status = 'listening',
+  interimTranscript = '',
+  decorativeVisualizer = false,
+}) => {
   const canvasRef = useRef(null);
   const transcriptRef = useRef(null);
+  const frameRef = useRef(0);
 
   const showTranscript =
     Boolean(interimTranscript?.trim()) &&
@@ -52,25 +80,51 @@ const VoiceVisualizer = ({ frequencyData, isActive, status = 'listening', interi
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) return undefined;
 
     const ctx = canvas.getContext('2d');
     const dpr = window.devicePixelRatio || 1;
-    const width = canvas.clientWidth;
-    const height = canvas.clientHeight;
+    let rafId = 0;
 
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, width, height);
+    const paint = () => {
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, width, height);
 
-    if (!isActive || !frequencyData || status !== 'listening') {
-      drawFlatLine(ctx, width, height);
-      return;
+      if (!isActive || status !== 'listening') {
+        drawFlatLine(ctx, width, height);
+        return;
+      }
+
+      if (decorativeVisualizer) {
+        frameRef.current += 1;
+        drawBars(ctx, width, height, decorativeLevels(frameRef.current));
+        return;
+      }
+
+      if (!frequencyData) {
+        drawFlatLine(ctx, width, height);
+        return;
+      }
+
+      drawBars(ctx, width, height, levelsFromFrequencyData(frequencyData));
+    };
+
+    if (decorativeVisualizer && isActive && status === 'listening') {
+      const loop = () => {
+        paint();
+        rafId = window.requestAnimationFrame(loop);
+      };
+      rafId = window.requestAnimationFrame(loop);
+      return () => window.cancelAnimationFrame(rafId);
     }
 
-    drawBars(ctx, width, height, frequencyData);
-  }, [frequencyData, isActive, status]);
+    paint();
+    return undefined;
+  }, [frequencyData, isActive, status, decorativeVisualizer]);
 
   const statusLabel =
     status === 'listening' ? 'Listening…' :
@@ -141,6 +195,7 @@ VoiceVisualizer.propTypes = {
   isActive: PropTypes.bool,
   status: PropTypes.oneOf(['listening', 'processing', 'speaking', 'idle']),
   interimTranscript: PropTypes.string,
+  decorativeVisualizer: PropTypes.bool,
 };
 
 export default VoiceVisualizer;
