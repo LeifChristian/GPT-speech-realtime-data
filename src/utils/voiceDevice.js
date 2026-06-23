@@ -20,10 +20,14 @@ export function hasSpeechRecognition() {
   );
 }
 
-/** Mobile/narrow/iOS: Whisper + MediaRecorder. Desktop: Web Speech API. */
+/**
+ * Whisper + MediaRecorder with shared mic stream.
+ * Mobile/narrow, iOS, and all Windows desktop widths.
+ */
 export function usesMobileVoicePath(windowWidth) {
   if (typeof windowWidth === 'number' && windowWidth < MOBILE_BREAKPOINT) return true;
   if (isIOSDevice()) return true;
+  if (isWindowsDesktop()) return true;
   return false;
 }
 
@@ -32,13 +36,9 @@ export function usesRecorderVoicePath(windowWidth) {
   return usesMobileVoicePath(windowWidth);
 }
 
-/**
- * Live mic stream for the visualizer / MediaRecorder.
- * Windows wide desktop skips this — getUserMedia blocks SpeechRecognition there.
- */
+/** Mac/Linux wide desktop only — live mic bars for Web Speech path. */
 export function shouldUseMicAnalyser(windowWidth) {
   if (usesMobileVoicePath(windowWidth)) return true;
-  if (isWindowsDesktop()) return false;
   return hasSpeechRecognition();
 }
 
@@ -49,7 +49,7 @@ export function canUseVoice(windowWidth) {
   return hasSpeechRecognition();
 }
 
-/** Decorative canvas bars only — no mic. Windows wide desktop while SpeechRecognition runs. */
+/** Decorative canvas bars when speech runs without a mic stream (unused on Windows now). */
 export function usesDecorativeVoiceVisualizer(windowWidth) {
   return !usesMobileVoicePath(windowWidth) && !shouldUseMicAnalyser(windowWidth);
 }
