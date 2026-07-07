@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { runChatWithTools, runSimpleChat } = require('../chat/orchestrator');
-const { CLASSIFY_SYSTEM_PROMPT } = require('../prompts/classify');
+const { CLASSIFY_SYSTEM_PROMPT, resolveClassification } = require('../prompts/classify');
 const { DEFAULT_PERSONALITY, PERSONALITIES } = require('../config/personalities');
+const { getConfiguredProviders } = require('../config/models');
 
 function resolvePersonalityId(requested, runtimeFallback) {
   const id = requested ?? runtimeFallback ?? DEFAULT_PERSONALITY;
@@ -62,24 +63,26 @@ router.post('/classify', async (req, res) => {
   }
 
   try {
-    const { provider, model } = runtime.text;
+    const configured = getConfiguredProviders();
+    const classifySlot = configured.openai
+      ? { provider: 'openai', model: 'gpt-4o-mini' }
+      : runtime.text;
+
     const raw = await runSimpleChat({
-      provider,
-      model,
+      provider: classifySlot.provider,
+      model: classifySlot.model,
       userMessage: prompt,
       system: CLASSIFY_SYSTEM_PROMPT,
       temperature: 0,
-      maxTokens: 10,
+      maxTokens: 16,
     });
 
-    const classification = String(raw).trim().toLowerCase();
-    console.log(`[CHAT][${req._rid}] /classify -> ${classification}`);
+    const classification = resolveClassification(prompt, raw);
+    console.log(
+      `[CHAT][${req._rid}] /classify raw="${String(raw).trim()}" -> ${classification} (model=${classifySlot.provider}:${classifySlot.model})`
+    );
 
-    if (classification === 'image_generation' || classification === 'text') {
-      res.json({ type: classification });
-    } else {
-      res.json({ type: 'text' });
-    }
+    res.json({ type: classification });
   } catch (error) {
     console.error(`[CHAT][${req._rid}] /classify error:`, error.message);
     res.json({ type: 'text' });

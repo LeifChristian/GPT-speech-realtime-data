@@ -19,6 +19,7 @@ const ModernUnifiedInput = ({
     downloadConvo,
     rez,
     handleGreeting,
+    handleUserPrompt,
     appendQuestionToHistory,
     appendResponseToHistory,
     windowWidth = typeof window !== 'undefined' ? window.innerWidth : MOBILE_BREAKPOINT,
@@ -155,21 +156,7 @@ const ModernUnifiedInput = ({
                 }
                 clearFile();
             } else {
-                const classificationType = await classifyPrompt(enteredText);
-
-                if (classificationType === 'image_generation') {
-                    handleResponse('Creating your image...', true);
-                    appendQuestionToHistory(enteredText.trim());
-                    const imageResponse = await handleImageGeneration(enteredText);
-
-                    if (imageResponse && imageResponse.type === 'image') {
-                        handleResponse(`Generated image: ${enteredText}`, false, imageResponse);
-                        appendResponseToHistory(`Generated image: ${enteredText}`);
-                    }
-                } else {
-                    // Use handleGreeting which auto-creates conversation if none selected
-                    await handleGreeting(enteredText);
-                }
+                await handleUserPrompt(enteredText);
             }
             setEnteredText('');
         } catch (error) {
@@ -389,7 +376,8 @@ ModernUnifiedInput.propTypes = {
     clearConversationHistory: PropTypes.func.isRequired,
     downloadConvo: PropTypes.func.isRequired,
     rez: PropTypes.string.isRequired,
-    handleGreeting: PropTypes.func.isRequired,
+    handleGreeting: PropTypes.func,
+    handleUserPrompt: PropTypes.func.isRequired,
     appendQuestionToHistory: PropTypes.func.isRequired,
     appendResponseToHistory: PropTypes.func.isRequired,
     windowWidth: PropTypes.number,

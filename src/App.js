@@ -53,18 +53,19 @@ function App() {
     }
 
     if (imageData && imageData.type === 'image') {
+      const prompt = imageData.prompt || enteredText;
       setGeneratedImage(imageData.content);
       setIsImageModalOpen(false);
       setIsImageSidebarOpen(true);
       const newImage = {
         id: Date.now(),
         url: imageData.content,
-        prompt: enteredText,
+        prompt,
         timestamp: new Date().toISOString()
       };
       setSessionImages(prev => [...prev, newImage]);
-      setRez(`Generated image: ${enteredText}`);
-      speak(`I've created an image based on your prompt: ${enteredText}`);
+      setRez(`Generated image: ${prompt}`);
+      speak(`I've created an image based on your prompt: ${prompt}`);
     } else {
       setRez(response1);
       speak(response1);
@@ -126,6 +127,7 @@ function App() {
     handleDeleteConversation,
     clearConversationHistory,
     handleGreeting,
+    handleUserPrompt,
     downloadConvo,
     setThisConversation,
     handleSelectConversation: selectConversation,
@@ -153,7 +155,7 @@ function App() {
     interimTranscript,
     stopVoiceMode,
     skipSpeechAndListen,
-  } = useSpeech(setRez, handleGreeting, setEnteredText, windowWidth);
+  } = useSpeech(setRez, handleUserPrompt, setEnteredText, windowWidth);
 
   useEffect(() => {
     speakTextRef.current = speakText;
@@ -307,6 +309,7 @@ function App() {
             conversation={conversations.find(c => c.id === selectedConversationId)}
             onClose={handleOverlayClose}
             handleGreeting={handleGreeting}
+            handleUserPrompt={handleUserPrompt}
             handleResponse={handleResponse}
             appendQuestionToHistory={appendQuestionToHistory}
             thumbnails={conversationThumbnails[selectedConversationId] || []}
@@ -423,6 +426,7 @@ function App() {
                 downloadConvo={downloadConvo}
                 rez={rez}
                 handleGreeting={handleGreeting}
+                handleUserPrompt={handleUserPrompt}
                 appendQuestionToHistory={appendQuestionToHistory}
                 appendResponseToHistory={appendResponseToHistory}
                 windowWidth={windowWidth}

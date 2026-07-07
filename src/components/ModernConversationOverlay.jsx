@@ -11,6 +11,7 @@ const ModernConversationOverlay = ({
     conversation,
     onClose,
     handleGreeting,
+    handleUserPrompt,
     handleResponse,
     appendQuestionToHistory,
     appendResponseToHistory,
@@ -269,20 +270,11 @@ const ModernConversationOverlay = ({
                 }
                 await handleImageAnalysis(analysisPrompt);
             } else {
-                if (inputText.trim() && !conversation.history.endsWith(`Question: ${inputText.trim()}`)) {
-                    await appendQuestionToHistory(inputText.trim());
-                }
-                const mode = await classifyPrompt(inputText.trim());
-                if (mode === 'image_generation') {
-                    handleResponse('Creating your image...', true);
-                    const imageResponse = await handleImageGeneration(inputText.trim());
-                    if (imageResponse && imageResponse.type === 'image') {
-                        handleResponse(`Generated image: ${inputText.trim()}`, false, imageResponse);
-                        addThumbnail?.(imageResponse.content, inputText.trim());
-                    }
-                } else {
-                    await handleGreeting(inputText.trim());
-                }
+                await handleUserPrompt(inputText.trim(), {
+                    onImageGenerated: (imageResponse, prompt) => {
+                        addThumbnail?.(imageResponse.content, prompt);
+                    },
+                });
             }
         } catch (err) {
             console.error('Submit error:', err);

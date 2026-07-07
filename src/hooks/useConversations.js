@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { apiUrl } from '../utils/api';
+import { classifyUserPrompt, generateImageFromPrompt } from '../utils/promptRouting';
 
 export function getDefaultConversationName(date = new Date()) {
   const formattedDate = date.toLocaleDateString('en-US', {
@@ -96,9 +97,6 @@ export const useConversations = (apiKey, setRez, handleResponse, getPersonalityI
     return newConversation;
   };
 
-  // hooks/useConversations.js
-  // ... other code remains the same ...
-
   const handleGreeting = async (theStuff) => {
     addDebugLog(`handleGreeting called with: ${theStuff}, selectedId: ${selectedConversationId}`);
     try {
@@ -178,6 +176,73 @@ export const useConversations = (apiKey, setRez, handleResponse, getPersonalityI
     } catch (error) {
       addDebugLog(`Error in handleGreeting: ${error.message}`);
       console.error("Error -->", error);
+    }
+  };
+
+  const handleUserPrompt = async (theStuff, options = {}) => {
+    const trimmed = String(theStuff || '').trim();
+    if (!trimmed) return;
+
+    addDebugLog(`handleUserPrompt called with: ${trimmed}`);
+
+    try {
+      const classificationType = await classifyUserPrompt(trimmed);
+
+      if (classificationType === 'image_generation') {
+        let currentConversation = conversations.find((conv) => conv.id === selectedConversationId);
+
+        if (!currentConversation) {
+          const autoName = getDefaultConversationName();
+          currentConversation = {
+            id: Date.now().toString(),
+            name: autoName,
+            history: '',
+          };
+          const updatedConversations = [...conversations, currentConversation];
+          setConversations(updatedConversations);
+          localStorage.setItem('conversations', JSON.stringify(updatedConversations));
+          localStorage.setItem('selectedConversationId', currentConversation.id);
+          setSelectedConversationId(currentConversation.id);
+          setThisConversation(currentConversation);
+        }
+
+        const questionHistory = currentConversation.history
+          ? `${currentConversation.history} Question: ${trimmed}`
+          : `Question: ${trimmed}`;
+        const responseLabel = `Generated image: ${trimmed}`;
+        const updatedConversation = {
+          ...currentConversation,
+          history: `${questionHistory} Response: ${responseLabel}`,
+        };
+        const updatedConversations = conversations.map((c) =>
+          c.id === updatedConversation.id ? updatedConversation : c
+        );
+        const withNew = conversations.some((c) => c.id === updatedConversation.id)
+          ? updatedConversations
+          : [...conversations, updatedConversation];
+
+        setConversations(withNew);
+        localStorage.setItem('conversations', JSON.stringify(withNew));
+        setThisConversation(updatedConversation);
+
+        handleResponse('Creating your image...', true);
+        const imageResponse = await generateImageFromPrompt(trimmed);
+
+        if (imageResponse?.type === 'image') {
+          options.onImageGenerated?.(imageResponse, trimmed);
+          setRez(responseLabel);
+          handleResponse(responseLabel, false, { ...imageResponse, prompt: trimmed });
+        } else {
+          handleResponse('Sorry, image generation failed.');
+        }
+        return;
+      }
+
+      await handleGreeting(trimmed);
+    } catch (error) {
+      addDebugLog(`Error in handleUserPrompt: ${error.message}`);
+      console.error('handleUserPrompt error:', error);
+      handleResponse('Sorry, there was an error processing your request.');
     }
   };
 
@@ -318,6 +383,7 @@ export const useConversations = (apiKey, setRez, handleResponse, getPersonalityI
     handleDeleteConversation,
     clearConversationHistory,
     handleGreeting,
+    handleUserPrompt,
     createAndSelectConversation,
     downloadConvo,
     setThisConversation,
