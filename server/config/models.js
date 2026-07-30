@@ -5,6 +5,15 @@ const {
   resolveDefaultSearchProvider,
   getConfiguredSearchProviders,
 } = require('./search');
+const {
+  getOpenAIApiKey,
+  getAnthropicApiKey,
+  getXaiApiKey,
+  getGroqApiKey,
+  getWeatherApiKey,
+  getNewsApiKey,
+  getShowsApiKey,
+} = require('./env');
 
 const MODEL_CATALOG = {
   text: [
@@ -52,10 +61,10 @@ function parseSlotKey(key) {
 
 function getConfiguredProviders() {
   return {
-    openai: !!(process.env.OPENAI_API_KEY || process.env.openAPIKey),
-    anthropic: !!process.env.ANTHROPIC_API_KEY,
-    xai: !!process.env.XAI_API_KEY,
-    groq: !!process.env.GROQ_API_KEY,
+    openai: !!getOpenAIApiKey(),
+    anthropic: !!getAnthropicApiKey(),
+    xai: !!getXaiApiKey(),
+    groq: !!getGroqApiKey(),
   };
 }
 
@@ -151,9 +160,9 @@ function applyRuntimeUpdates(current, updates = {}) {
 
 function getToolSourceStatus() {
   return {
-    weather: !!process.env.weatherAPIKey,
-    news: !!(process.env.newsAPIKey || process.env.NEWS_API_KEY || process.env.NEWSDATA_API_KEY),
-    shows: !!process.env.showsAPIKey,
+    weather: !!getWeatherApiKey(),
+    news: !!getNewsApiKey(),
+    shows: !!getShowsApiKey(),
   };
 }
 

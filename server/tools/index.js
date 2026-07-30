@@ -1,5 +1,6 @@
 const axios = require('axios');
 const { runWebSearch } = require('./search');
+const { getWeatherApiKey, getNewsApiKey, getShowsApiKey } = require('../config/env');
 
 async function get_population(city) {
   const minPopulation = 1;
@@ -15,8 +16,12 @@ async function get_population(city) {
 async function get_current_weather({ location, unit = 'fahrenheit' }) {
   try {
     console.log(`[WEATHER] Fetching for location: ${location}, unit: ${unit}`);
+    const weatherApiKey = getWeatherApiKey();
+    if (!weatherApiKey) {
+      return JSON.stringify({ status: 'error', message: 'Weather API key is not configured' });
+    }
     const weatherResponse = await fetch(
-      `https://api.openweathermap.org/data/2.5/weather?q=${location}&units=imperial&appid=${process.env.weatherAPIKey}`
+      `https://api.openweathermap.org/data/2.5/weather?q=${location}&units=imperial&appid=${weatherApiKey}`
     );
     const weatherData = await weatherResponse.json();
 
@@ -38,7 +43,7 @@ async function get_current_weather({ location, unit = 'fahrenheit' }) {
 }
 
 async function get_news(query) {
-  const apiKey = process.env.newsAPIKey || process.env.NEWS_API_KEY || process.env.NEWSDATA_API_KEY;
+  const apiKey = getNewsApiKey();
   const url = `https://newsdata.io/api/1/news?apikey=${apiKey}&q=${encodeURIComponent(query)}`;
 
   try {
@@ -62,7 +67,7 @@ async function get_news(query) {
 }
 
 async function get_shows(query) {
-  const apiKey = process.env.showsAPIKey;
+  const apiKey = getShowsApiKey();
   const apiHost = 'streaming-availability.p.rapidapi.com';
   const url = `https://streaming-availability.p.rapidapi.com/shows/search/filters?series_granularity=show&order_direction=asc&order_by=original_title&genres_relation=and&output_language=en&show_type=movie&country=US&keyword=${encodeURIComponent(query)}`;
 

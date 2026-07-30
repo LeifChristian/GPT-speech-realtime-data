@@ -68,7 +68,7 @@ router.post('/classify', async (req, res) => {
       ? { provider: 'openai', model: 'gpt-4o-mini' }
       : runtime.text;
 
-    const raw = await runSimpleChat({
+    const result = await runSimpleChat({
       provider: classifySlot.provider,
       model: classifySlot.model,
       userMessage: prompt,
@@ -77,9 +77,10 @@ router.post('/classify', async (req, res) => {
       maxTokens: 16,
     });
 
-    const classification = resolveClassification(prompt, raw);
+    const rawText = result.text || '';
+    const classification = resolveClassification(prompt, rawText);
     console.log(
-      `[CHAT][${req._rid}] /classify raw="${String(raw).trim()}" -> ${classification} (model=${classifySlot.provider}:${classifySlot.model})`
+      `[CHAT][${req._rid}] /classify raw="${String(rawText).trim()}" -> ${classification} (model=${classifySlot.provider}:${classifySlot.model})`
     );
 
     res.json({ type: classification });

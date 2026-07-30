@@ -1,10 +1,14 @@
 const axios = require('axios');
 const { formatSerpResults } = require('./format');
+const { getPerplexityApiKey } = require('../../config/env');
 
 async function searchPerplexity(query) {
-  const apiKey = process.env.PERPLEXITY_API_KEY;
+  const apiKey = getPerplexityApiKey();
   if (!apiKey) {
-    return { error: 'Perplexity API key is not configured. Set PERPLEXITY_API_KEY.' };
+    return {
+      error:
+        'Perplexity API key is not configured. Set PERPLEXITY_API_KEY, perplexityAPIKey, or searchAPIKey.',
+    };
   }
 
   console.log('[PPLX] live search', { query: String(query || '').slice(0, 160) });

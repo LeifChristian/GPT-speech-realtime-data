@@ -1,11 +1,12 @@
 const axios = require('axios');
 const { TOOL_DEFINITIONS } = require('../tools/definitions');
+const { getAnthropicApiKey } = require('../config/env');
 
 const BASE_URL = 'https://api.anthropic.com/v1';
 
 function getHeaders() {
   return {
-    'x-api-key': process.env.ANTHROPIC_API_KEY,
+    'x-api-key': getAnthropicApiKey(),
     'anthropic-version': '2023-06-01',
     'content-type': 'application/json',
   };

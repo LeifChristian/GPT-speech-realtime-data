@@ -1,10 +1,13 @@
 const axios = require('axios');
 const { formatSerpResults } = require('./format');
+const { getBraveApiKey } = require('../../config/env');
 
 async function searchBrave(query) {
-  const apiKey = process.env.BRAVE_API_KEY;
+  const apiKey = getBraveApiKey();
   if (!apiKey) {
-    return { error: 'Brave Search API key is not configured. Set BRAVE_API_KEY.' };
+    return {
+      error: 'Brave Search API key is not configured. Set BRAVE_API_KEY or braveAPIKey.',
+    };
   }
 
   const q = String(query || '').slice(0, 400);

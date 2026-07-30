@@ -1,9 +1,10 @@
 const { OpenAI } = require('openai');
 const { TOOL_DEFINITIONS } = require('../tools/definitions');
 const { findCatalogEntry } = require('../config/models');
+const { getOpenAIApiKey } = require('../config/env');
 
 function getOpenAIClient() {
-  const apiKey = process.env.OPENAI_API_KEY || process.env.openAPIKey;
+  const apiKey = getOpenAIApiKey();
   if (!apiKey) return null;
   return new OpenAI({ apiKey });
 }

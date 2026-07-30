@@ -1,10 +1,12 @@
 // middleware/authMiddleware.js
 require('dotenv').config();
+const { getAuthCode } = require('../config/env');
 
 const checkAuth = (req, res, next) => {
   const { code } = req.body;
+  const expected = getAuthCode();
 
-  if (!code || code !== process.env.theCode) {
+  if (!code || !expected || code !== expected) {
     console.log('Unauthorized access attempt');
     return res.status(401).json({ 
       error: 'Unauthorized',

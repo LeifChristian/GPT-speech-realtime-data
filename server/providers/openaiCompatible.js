@@ -1,4 +1,5 @@
 const { OpenAI } = require('openai');
+const { getXaiApiKey, getGroqApiKey } = require('../config/env');
 
 const PROVIDER_BASE_URLS = {
   xai: 'https://api.x.ai/v1',
@@ -12,8 +13,8 @@ function getClient(provider) {
   }
 
   const apiKeyEnv = {
-    xai: process.env.XAI_API_KEY,
-    groq: process.env.GROQ_API_KEY,
+    xai: getXaiApiKey(),
+    groq: getGroqApiKey(),
   };
 
   const apiKey = apiKeyEnv[provider];

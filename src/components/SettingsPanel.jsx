@@ -173,7 +173,7 @@ const SettingsPanel = ({ config, loading, saving, error, onChange }) => {
                     onChange={(e) => handleSearchProviderChange(e.target.value)}
                   >
                     {searchOptions.length === 0 ? (
-                      <option value="">No search API — add BRAVE_API_KEY or PERPLEXITY_API_KEY</option>
+                      <option value="">No search API — add perplexityAPIKey, BRAVE_API_KEY, or bingAPIKey</option>
                     ) : (
                       searchOptions.map((p) => (
                         <option key={p.id} value={p.id} className="text-black">
