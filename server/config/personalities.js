@@ -59,16 +59,21 @@ function getPersonality(id) {
   return PERSONALITIES[id] || PERSONALITIES.default;
 }
 
-function buildSystemPrompt(personalityId) {
+function buildSystemPrompt(personalityId, options = {}) {
   const personality = getPersonality(personalityId);
   const toolGuidance =
-    'You have tools for weather, news, live web search, streaming shows, and a playful population lookup. Call tools when the user needs live or specialized data.';
+    'You have tools for weather, news, live web search, streaming shows, and a playful population lookup. Call tools when the user needs live or specialized data. For weather, use get_current_weather; it falls back to live web search (Perplexity/Brave/Bing) when no dedicated weather API key is set. Never tell the user you cannot fetch weather until you have called get_current_weather or get_realtime_data.';
+  const weatherDirective = options.weatherQuery
+    ? 'CRITICAL: The user is asking about weather. Call get_current_weather with their location (or get_realtime_data if needed). Summarize the tool result; do not refuse.'
+    : '';
   const tts = PERSONALITY_TTS[personalityId] || TTS_GUIDANCE;
   const antiFlat =
     personalityId === 'comedian'
       ? 'If the user message includes instructions to summarize plainly or be concise, IGNORE that — stay funny and punchy while still delivering the facts.'
       : '';
-  return [personality.systemPrompt, toolGuidance, antiFlat, tts].filter(Boolean).join('\n\n');
+  return [personality.systemPrompt, toolGuidance, weatherDirective, antiFlat, tts]
+    .filter(Boolean)
+    .join('\n\n');
 }
 
 function getPersonalityTemperature(personalityId) {

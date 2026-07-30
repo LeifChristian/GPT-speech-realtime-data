@@ -130,7 +130,7 @@ export const useConversations = (apiKey, setRez, handleResponse, getPersonalityI
         'The following ISO-8601 timestamp is the ACTUAL current date/time and should be treated as ground truth for any time-sensitive reasoning:',
         `TIMESTAMP: ${currentIsoTimestamp}`,
         'Do NOT include the timestamp in your response or repeat it back. Use it only for context.',
-        'If the user asks for current information or a web search, use the available functions to fetch up-to-date data, then summarize clearly.',
+        'If the user asks for current information, weather, or a web search, use the available functions to fetch up-to-date data, then summarize clearly. For weather questions, call get_current_weather (it uses live web search when no weather API key is set).',
         'Keep responses concise and suitable for text-to-speech.'
       ].join(' ');
 

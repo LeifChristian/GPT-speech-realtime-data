@@ -1,6 +1,7 @@
 const axios = require('axios');
 const { runWebSearch } = require('./search');
 const { getWeatherApiKey, getNewsApiKey, getShowsApiKey } = require('../config/env');
+const { getConfiguredSearchProviders } = require('../config/search');
 
 async function get_population(city) {
   const minPopulation = 1;
@@ -13,13 +14,33 @@ async function get_population(city) {
   });
 }
 
-async function get_current_weather({ location, unit = 'fahrenheit' }) {
+async function weatherViaWebSearch(location, searchProvider) {
+  const query = `current weather conditions and temperature in ${location} right now`;
+  const configured = getConfiguredSearchProviders();
+  const candidates = [searchProvider, 'perplexity', 'brave', 'bing'].filter(
+    (provider, index, list) => configured[provider] && list.indexOf(provider) === index
+  );
+
+  for (const provider of candidates) {
+    console.log(`[WEATHER] Trying web search via ${provider} for ${location}`);
+    const result = await get_realtime_data(query, provider);
+    if (result && !/^error/i.test(result) && !/not configured/i.test(result)) {
+      return result;
+    }
+    console.log(`[WEATHER] Web search via ${provider} failed`);
+  }
+
+  return `Unable to fetch current weather for ${location} via web search.`;
+}
+
+async function get_current_weather({ location, unit = 'fahrenheit' }, searchProvider = 'perplexity') {
   try {
     console.log(`[WEATHER] Fetching for location: ${location}, unit: ${unit}`);
     const weatherApiKey = getWeatherApiKey();
     if (!weatherApiKey) {
-      return JSON.stringify({ status: 'error', message: 'Weather API key is not configured' });
+      return weatherViaWebSearch(location, searchProvider);
     }
+
     const weatherResponse = await fetch(
       `https://api.openweathermap.org/data/2.5/weather?q=${location}&units=imperial&appid=${weatherApiKey}`
     );
@@ -27,7 +48,7 @@ async function get_current_weather({ location, unit = 'fahrenheit' }) {
 
     if (!weatherData?.main || typeof weatherData.main.temp === 'undefined') {
       console.error(`[WEATHER] Invalid data: ${JSON.stringify(weatherData)}`);
-      return JSON.stringify({ status: 'error', message: 'Weather data unavailable' });
+      return weatherViaWebSearch(location, searchProvider);
     }
 
     return JSON.stringify({
@@ -38,7 +59,7 @@ async function get_current_weather({ location, unit = 'fahrenheit' }) {
     });
   } catch (error) {
     console.error(`[WEATHER] Error: ${error.message}`);
-    return JSON.stringify({ status: 'error', message: 'Failed to fetch weather' });
+    return weatherViaWebSearch(location, searchProvider);
   }
 }
 
@@ -108,7 +129,7 @@ async function get_realtime_data(query, searchProvider = 'brave') {
 }
 
 const TOOL_EXECUTORS = {
-  get_current_weather: (args) => get_current_weather(args),
+  get_current_weather: (args, ctx) => get_current_weather(args, ctx?.searchProvider),
   get_population: (args) => get_population(args.city),
   get_realtime_data: (args, ctx) => get_realtime_data(args.query, ctx?.searchProvider),
   get_news: (args) => get_news(args.query),

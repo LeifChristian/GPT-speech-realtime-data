@@ -5,7 +5,8 @@
 const TOOL_DEFINITIONS = [
   {
     name: 'get_current_weather',
-    description: 'Get the current weather in a given location',
+    description:
+      'Get the current weather in a given location. Uses live web search when a dedicated weather API key is not configured.',
     parameters: {
       type: 'object',
       properties: {
