@@ -2,6 +2,11 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useMicAnalyser } from './useMicAnalyser';
 import { usesMobileVoicePath, shouldUseMicAnalyser } from '../utils/voiceDevice';
 import { getRecorderMimeType, transcribeAudio } from '../utils/transcribeAudio';
+import {
+  splitTextForSpeech,
+  pickPreferredVoice,
+  startSpeechKeepAlive,
+} from '../utils/speechSynthesis';
 
 const RELISTEN_DELAY_MS = 750;
 const SKIP_TO_LISTEN_DELAY_MS = 200;
@@ -32,6 +37,7 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
   const relistenTimerRef = useRef(null);
   const handleGreetingRef = useRef(handleGreeting);
   const speechSessionRef = useRef(0);
+  const speechKeepAliveStopRef = useRef(null);
   const inactivityTimerRef = useRef(null);
   const stopVoiceModeRef = useRef(() => {});
   const resetInactivityTimerRef = useRef(() => {});
@@ -88,17 +94,26 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
   }, []);
 
   /** Invalidate queued TTS segments and stop current utterance */
+  const stopSpeechKeepAlive = useCallback(() => {
+    if (speechKeepAliveStopRef.current) {
+      speechKeepAliveStopRef.current();
+      speechKeepAliveStopRef.current = null;
+    }
+  }, []);
+
   const cancelActiveSpeech = useCallback(() => {
     speechSessionRef.current += 1;
     speechSynthClearRef.current = Date.now();
+    stopSpeechKeepAlive();
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       speechSynthesis.cancel();
     }
-  }, []);
+  }, [stopSpeechKeepAlive]);
 
   const flushSpeechSynthesis = useCallback(() => {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
     speechSynthClearRef.current = Date.now();
+    stopSpeechKeepAlive();
     speechSynthesis.cancel();
     try {
       speechSynthesis.pause();
@@ -106,7 +121,7 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
     } catch {
       // ignore — not supported everywhere
     }
-  }, []);
+  }, [stopSpeechKeepAlive]);
 
   const getVolumeLevel = useCallback(() => {
     const analyser = getAnalyser();
@@ -546,6 +561,8 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
   }, [stopListeningInternal]);
 
   const onSpeechComplete = useCallback((options = {}) => {
+    stopSpeechKeepAlive();
+
     if (options.skipRelisten) {
       awaitingTtsRef.current = false;
       if (voiceModeRef.current && !isProcessingRef.current) {
@@ -565,7 +582,7 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
     } else {
       setVoiceStatus('idle');
     }
-  }, [scheduleRelisten]);
+  }, [scheduleRelisten, stopSpeechKeepAlive]);
 
   const speakText = useCallback((text, options = {}) => {
     function removeUrls(input) {
@@ -583,8 +600,10 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
       return;
     }
 
+    // Block voice relisten for the full multi-segment playback window.
+    awaitingTtsRef.current = true;
+
     if (voiceModeRef.current) {
-      awaitingTtsRef.current = true;
       setVoiceStatus('speaking');
       stopListeningInternal();
       if (mobileVoicePath) {
@@ -601,86 +620,59 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
 
     cancelActiveSpeech();
     const sessionId = speechSessionRef.current;
-
-    const splitTextIntoSegments = (input) => {
-      const maxWordsPerSegment = 32;
-      // Avoid splitting decimals (1.00), times (12:30), etc. Punctuation is consumed at boundaries.
-      const boundaryPattern = /(?<!\d)[.!?](?!\d)|(?<!\d):(?!\d)/g;
-      const parts = input.split(boundaryPattern);
-      const segments = [];
-      let currentSegment = '';
-
-      const flushSegment = () => {
-        const trimmed = currentSegment.trim();
-        if (trimmed) segments.push(trimmed);
-        currentSegment = '';
-      };
-
-      parts.forEach((part) => {
-        const trimmed = part.trim();
-        if (!trimmed) return;
-
-        const words = trimmed.split(/\s+/).filter(Boolean);
-        words.forEach((word) => {
-          const wordCount = currentSegment ? currentSegment.split(/\s+/).filter(Boolean).length : 0;
-          if (wordCount >= maxWordsPerSegment) {
-            flushSegment();
-            currentSegment = word;
-          } else {
-            currentSegment += (currentSegment ? ' ' : '') + word;
-          }
-        });
-        flushSegment();
-      });
-
-      return segments;
-    };
-
-    const prepareSpeechSegment = (segment) =>
-      String(segment || '').replace(/^Response:\s*/i, '').trim();
-
-    const segments = splitTextIntoSegments(cleaned);
+    const segments = splitTextForSpeech(cleaned);
 
     const isSessionActive = () => sessionId === speechSessionRef.current;
+
+    const finishSpeech = () => {
+      if (!isSessionActive()) return;
+      stopSpeechKeepAlive();
+      onSpeechComplete(options);
+    };
 
     const synthesizeSegments = () => {
       if (!isSessionActive()) return;
 
       if (segments.length === 0) {
-        onSpeechComplete(options);
+        finishSpeech();
         return;
       }
 
-      const segment = segments.shift();
-      const speechText = prepareSpeechSegment(segment);
+      const speechText = segments.shift();
       if (!speechText) {
         synthesizeSegments();
         return;
       }
 
       const utterance = new SpeechSynthesisUtterance(speechText);
-
-      const voices = speechSynthesis.getVoices();
-      const preferred =
-        voices.find((v) => /en/i.test(v.lang) && /(Google US|Samantha|Microsoft|Female|Natural)/i.test(v.name)) ||
-        voices.find((v) => /en/i.test(v.lang)) ||
-        voices[0];
+      const preferred = pickPreferredVoice(speechSynthesis.getVoices());
       if (preferred) utterance.voice = preferred;
       utterance.rate = 1.0;
 
+      utterance.onstart = () => {
+        if (!isSessionActive()) return;
+        if (!speechKeepAliveStopRef.current) {
+          speechKeepAliveStopRef.current = startSpeechKeepAlive(speechSynthesis);
+        }
+        setIsPlaying(true);
+      };
+
       utterance.onend = () => {
         if (!isSessionActive()) return;
-        synthesizeSegments();
+        // Brief gap between segments helps Chrome flush the queue reliably.
+        setTimeout(() => {
+          if (!isSessionActive()) return;
+          synthesizeSegments();
+        }, 60);
       };
+
       utterance.onerror = (event) => {
         if (!isSessionActive()) return;
-        // cancel()/interrupt should not advance to the next queued segment
         if (event?.error === 'interrupted' || event?.error === 'canceled') return;
         synthesizeSegments();
       };
 
       speechSynthesis.speak(utterance);
-      setIsPlaying(true);
     };
 
     if (speechSynthesis.getVoices().length === 0) {
@@ -692,7 +684,13 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
     } else {
       synthesizeSegments();
     }
-  }, [onSpeechComplete, stopListeningInternal, cancelActiveSpeech, mobileVoicePath]);
+  }, [
+    onSpeechComplete,
+    stopListeningInternal,
+    cancelActiveSpeech,
+    mobileVoicePath,
+    stopSpeechKeepAlive,
+  ]);
 
   const stopSpeakText = useCallback(() => {
     cancelActiveSpeech();
@@ -767,8 +765,9 @@ export const useSpeech = (setRez, handleGreeting, setEnteredText, windowWidth = 
       if (typeof window !== 'undefined' && window.speechSynthesis?.speaking) {
         window.speechSynthesis.cancel();
       }
+      stopSpeechKeepAlive();
     };
-  }, [clearRelistenTimer, clearInactivityTimer, cancelMobileVad]);
+  }, [clearRelistenTimer, clearInactivityTimer, cancelMobileVad, stopSpeechKeepAlive]);
 
   return {
     isRecording,
